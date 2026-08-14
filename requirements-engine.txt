@@ -1,0 +1,11 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+faster-whisper==1.2.1
+ctranslate2==4.7.1
+demucs==4.0.1
+openai-whisper>=20231117
+torch==2.5.1+cu121
+torchaudio==2.5.1+cu121
+openai>=1.0.0
+httpx>=0.24.0
+huggingface_hub>=0.23.0

@@ -1,0 +1,46 @@
+.venv/
+.engine/
+.cache/
+.wheelhouse/
+build/
+dist/
+__pycache__/
+*.pyc
+*.spec.bak
+models_faster/
+output/
+test_logs/
+.safety/
+
+# Private local configuration. Never commit API keys or personal presets.
+user_settings.json
+user_presets.json
+*.local.json
+secrets.*
+.env
+.env.*
+!.env.example
+!user_settings.example.json
+
+# Local media and generated subtitle artifacts.
+smoke_media/
+input/
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.wav
+*.mp3
+*.flac
+*.srt
+*.ass
+*.hash
+
+# Local reference lyrics may be copyrighted or private. Keep only guidance in Git.
+test_assets/lyrics_refs/*.txt
+!test_assets/lyrics_refs/README.md
+
+# Logs can contain absolute local paths or provider diagnostics.
+*.log
+crash_trace.log
+launcher_crash.log

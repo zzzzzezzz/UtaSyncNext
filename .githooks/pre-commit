@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+if [ -x ".venv/Scripts/python.exe" ]; then
+    PYTHON=".venv/Scripts/python.exe"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON="python"
+else
+    echo "Python is required for UtaSyncNext safety checks." >&2
+    exit 1
+fi
+
+"$PYTHON" tools/check_no_secrets.py
+"$PYTHON" tools/v3_guard.py verify

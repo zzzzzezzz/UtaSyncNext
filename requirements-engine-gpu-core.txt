@@ -1,0 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+ctranslate2==4.7.1
+torch==2.5.1+cu121
+torchaudio==2.5.1+cu121

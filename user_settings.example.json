@@ -1,0 +1,20 @@
+{
+  "api_key": "",
+  "api_preset": "SiliconFlow (DeepSeek-V3)",
+  "api_url": "https://api.siliconflow.cn/v1",
+  "api_model": "deepseek-ai/DeepSeek-V3",
+  "api_preset_design": "Same as translation engine",
+  "api_url_design": "",
+  "api_model_design": "",
+  "api_key_design": "",
+  "model_size": "large-v2",
+  "audio_type": "Live",
+  "output_mode": "Bilingual",
+  "use_demucs": "先跳过 Demucs (极速/推荐先出轴)",
+  "hardware_mode": "极限防爆 (4G~6G显存/默认)",
+  "ass_preset": "Default",
+  "proxy_url": "",
+  "model_download_proxy": "",
+  "media_path": "",
+  "cached_lyrics": ""
+}
