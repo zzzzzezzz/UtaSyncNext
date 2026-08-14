@@ -13,7 +13,24 @@ from typing import Callable
 
 
 ProgressCallback = Callable[[float, str], None]
-PROMPT_POLICY_VERSION = "next-v4-v3-lyric-guardrails"
+PROMPT_POLICY_VERSION = "next-v6-timeline-speaker-lyric-guardrails"
+SPEAKER_COLON_RE = re.compile(
+    r"^(?P<label>[A-Za-z][A-Za-z0-9_. -]{1,24}|[\u3400-\u9fff\u3040-\u30ffー]{2,8})\s*[:：]"
+)
+SPEAKER_BARE_RE = re.compile(r"^(?P<label>[A-Z][A-Za-z]{2,20}|[\u3400-\u9fff]{2,4})\s+")
+KNOWN_SPEAKER_LABELS = {
+    "fukai",
+    "higuchi",
+    "tomitake",
+    "yanyan",
+    "yanyang",
+    "向井",
+    "深井",
+    "樋口",
+    "神谷",
+    "とみたけ",
+    "ヤンヤン",
+}
 
 
 @dataclass(frozen=True)
@@ -21,6 +38,7 @@ class SrtBlock:
     index: int
     time_line: str
     text_lines: tuple[str, ...]
+    index_explicit: bool = True
 
     def to_srt(self) -> str:
         return f"{self.index}\n{self.time_line}\n" + "\n".join(self.text_lines)
@@ -75,6 +93,8 @@ class SubtitleTranslator:
         self.total_batches = 0
         self.cache_hits = 0
         self.api_calls = 0
+        self.alignment_fallbacks = 0
+        self.speaker_label_warnings = 0
 
         client_kwargs = {
             "api_key": api_key,
@@ -150,14 +170,23 @@ class SubtitleTranslator:
                 continue
 
             index = fallback_index
+            index_explicit = False
             if time_idx > 0:
                 digits = re.sub(r"\D", "", lines[0])
                 if digits:
                     index = int(digits)
+                    index_explicit = True
 
             text_lines = tuple(lines[time_idx + 1 :])
             if text_lines:
-                parsed.append(SrtBlock(index=index, time_line=lines[time_idx], text_lines=text_lines))
+                parsed.append(
+                    SrtBlock(
+                        index=index,
+                        time_line=lines[time_idx],
+                        text_lines=text_lines,
+                        index_explicit=index_explicit,
+                    )
+                )
 
         return parsed
 
@@ -245,6 +274,7 @@ class SubtitleTranslator:
 
         prompt = self._build_prompt(original_batch_srt, prev_context, reference_lyrics)
         max_retries = 4
+        speaker_cleanup_retry = False
 
         for attempt in range(max_retries):
             if self.cancel_event and self.cancel_event.is_set():
@@ -252,6 +282,13 @@ class SubtitleTranslator:
 
             try:
                 self.api_calls += 1
+                request_prompt = prompt
+                if speaker_cleanup_retry:
+                    request_prompt += (
+                        "\n\n【本批次修正】上次输出仍含疑似说话人冠名。"
+                        "删除每句开头及句中用于区分角色的‘姓名：’或‘姓名 台词’标签，"
+                        "但必须保留自我介绍、称呼别人、英文歌词、歌名、反复句以及句意中自然出现的真实姓名。"
+                    )
                 response = self.client.chat.completions.create(
                     model=target_model,
                     messages=[
@@ -259,7 +296,7 @@ class SubtitleTranslator:
                             "role": "system",
                             "content": "你是严谨的日语 Live 字幕翻译与排版助手，只返回 SRT。",
                         },
-                        {"role": "user", "content": prompt},
+                        {"role": "user", "content": request_prompt},
                     ],
                     temperature=0.1,
                     max_tokens=8192,
@@ -273,6 +310,22 @@ class SubtitleTranslator:
                     raise RuntimeError("API 没有返回有效 SRT。")
                 if result_text.count("-->") < max(1, len(batch) * 0.6):
                     raise RuntimeError("API 返回字幕数量明显不足。")
+
+                labels = _suspected_speaker_labels(result_text)
+                if labels and not speaker_cleanup_retry:
+                    speaker_cleanup_retry = True
+                    print(
+                        f"      批次 {batch_idx + 1}/{total_batches} 检测到疑似说话人冠名，正在局部重试: "
+                        + ", ".join(labels)
+                    )
+                    continue
+                if labels:
+                    with self.failure_lock:
+                        self.speaker_label_warnings += len(labels)
+                    print(
+                        f"      [提醒] 批次 {batch_idx + 1}/{total_batches} 仍有疑似说话人冠名，请复核: "
+                        + ", ".join(labels)
+                    )
 
                 restored = self._restore_timestamps(result_text, batch)
                 self._save_to_cache(cache_key, restored)
@@ -354,7 +407,7 @@ class SubtitleTranslator:
             output_rules = """
 6. 每个时间轴只输出一行中文。
 7. 输出中不要包含日文平假名、片假名；真实人名可音译或保留罗马字。
-8. 不要凭空添加人名、说话人标签或角色名。
+8. 字幕不采用“姓名：台词”或“姓名 台词”的说话人冠名格式；真实人名在句意中可正常保留。
 9. 无意义杂音、纯和声可删除，但不要输出解释。
 """
         else:
@@ -362,7 +415,7 @@ class SubtitleTranslator:
 6. 每个时间轴最多输出两行：第一行校正后的日文，第二行中文。
 7. 日文和中文都不要在同一语言内部拆成多行。
 8. 如果有参考歌词，必须优先用参考歌词校正日文原文；不要照抄粗听中的错误假名或片假名。
-9. 不要凭空添加人名、说话人标签或角色名。
+9. 字幕不采用“姓名：台词”或“姓名 台词”的说话人冠名格式；真实人名在句意中可正常保留。
 10. 无意义杂音、纯和声可删除，但不要输出解释。
 """
 
@@ -376,7 +429,9 @@ class SubtitleTranslator:
             "5. 参考歌词没有对应内容时，必须按粗听内容盲翻，不要跳过。",
             "6. 不要输出“无对应歌词”“这里是和声”“听不清”等说明文字。",
             "7. 不要为了变短而省略后半句；需要压缩时保留主语、动作和情绪。",
-            "8. 严禁新增说话人姓名、人名标签或角色名；除非输入 SRT 原文已经明确写着该标签。",
+            "8. 输入开头疑似说话人名称只用于理解，不要作为字幕冠名前缀输出。",
+            "9. 不要删除句意中的姓名：自我介绍、称呼别人、歌词正文里自然出现的人名必须保留。",
+            "10. 英文歌词、歌名和反复句属于字幕正文，即使反复出现在句首也必须完整保留。",
             self._layout_prompt_rules(),
             output_rules.strip(),
         ]
@@ -411,14 +466,31 @@ class SubtitleTranslator:
     def _restore_timestamps(self, translated_content: str, original_blocks: list[SrtBlock]) -> str:
         translated_blocks = _parse_srt_text(translated_content)
         restored: list[str] = []
+        by_time: dict[str, list[SrtBlock]] = {}
+        by_index: dict[int, list[SrtBlock]] = {}
+        for block in translated_blocks:
+            by_time.setdefault(_normalize_time_line(block.time_line), []).append(block)
+            if block.index_explicit:
+                by_index.setdefault(block.index, []).append(block)
 
-        for pos, original in enumerate(original_blocks):
-            translated = translated_blocks[pos] if pos < len(translated_blocks) else None
+        used: set[int] = set()
+        fallback_count = 0
+        for original in original_blocks:
+            translated = _take_unused(by_time.get(_normalize_time_line(original.time_line), []), used)
+            if translated is None:
+                translated = _take_unused(by_index.get(original.index, []), used)
+            if translated is None:
+                fallback_count += 1
             text_lines = translated.text_lines if translated and translated.text_lines else original.text_lines
             filtered = self._filter_text_lines(text_lines)
             if not filtered:
                 continue
             restored.append(f"{original.index}\n{original.time_line}\n" + "\n".join(filtered))
+
+        if fallback_count:
+            with self.failure_lock:
+                self.alignment_fallbacks += fallback_count
+            print(f"      [时间轴保护] {fallback_count} 条译文未可靠对齐，已保留对应原文，未顺移后续字幕。")
 
         return "\n\n".join(restored)
 
@@ -519,8 +591,44 @@ def _parse_srt_text(content: str) -> list[SrtBlock]:
         index = int(digits) if digits else fallback_index
         text_lines = tuple(lines[time_idx + 1 :])
         if text_lines:
-            parsed.append(SrtBlock(index=index, time_line=lines[time_idx], text_lines=text_lines))
+            parsed.append(
+                SrtBlock(
+                    index=index,
+                    time_line=lines[time_idx],
+                    text_lines=text_lines,
+                    index_explicit=bool(digits),
+                )
+            )
     return parsed
+
+
+def _normalize_time_line(value: str) -> str:
+    return re.sub(r"\s+", "", str(value or ""))
+
+
+def _take_unused(candidates: list[SrtBlock], used: set[int]) -> SrtBlock | None:
+    for candidate in candidates:
+        identity = id(candidate)
+        if identity not in used:
+            used.add(identity)
+            return candidate
+    return None
+
+
+def _suspected_speaker_labels(content: str) -> list[str]:
+    labels: set[str] = set()
+    for line in content.splitlines():
+        text = line.strip()
+        if not text or text.isdigit() or "-->" in text:
+            continue
+        colon = SPEAKER_COLON_RE.match(text)
+        if colon:
+            labels.add(colon.group("label").strip())
+            continue
+        bare = SPEAKER_BARE_RE.match(text)
+        if bare and bare.group("label").strip().casefold() in KNOWN_SPEAKER_LABELS:
+            labels.add(bare.group("label").strip())
+    return sorted(labels, key=str.casefold)
 
 
 def _blocks_to_srt(blocks: list[SrtBlock]) -> str:

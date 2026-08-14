@@ -11,6 +11,9 @@ models_faster/
 output/
 test_logs/
 .safety/
+test_workspace/cases.local.json
+test_workspace/reports/
+test_workspace/runs/
 
 # Private local configuration. Never commit API keys or personal presets.
 user_settings.json

@@ -194,6 +194,8 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
             "translation_cache_hits": 0,
             "translation_api_calls": 0,
             "translation_failed_batches": 0,
+            "translation_alignment_fallbacks": 0,
+            "translation_speaker_label_warnings": 0,
             "ass_generated": False,
             "cuda_fallback_used": False,
             "layout_profile": layout_policy.profile,
@@ -308,6 +310,10 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
                     "translation_cache_hits": int(getattr(translator, "cache_hits", 0) or 0),
                     "translation_api_calls": int(getattr(translator, "api_calls", 0) or 0),
                     "translation_failed_batches": int(getattr(translator, "failed_batches", 0) or 0),
+                    "translation_alignment_fallbacks": int(getattr(translator, "alignment_fallbacks", 0) or 0),
+                    "translation_speaker_label_warnings": int(
+                        getattr(translator, "speaker_label_warnings", 0) or 0
+                    ),
                 }
             )
             _safe_unlink(temp_lyrics_path)
@@ -670,7 +676,7 @@ def _build_translation_cache_hash(
         }
     return _hash_payload(
         {
-            "version": 4,
+            "version": 6,
             "media": media_fingerprint,
             "source_srt": _file_content_hash(source_srt),
             "lyrics": lyrics_text,

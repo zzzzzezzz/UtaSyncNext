@@ -85,6 +85,8 @@ def main() -> int:
     _add(results, "pipeline-cache-fingerprint", _check_pipeline_cache_fingerprint)
     _add(results, "pipeline-preview", _check_pipeline_preview)
     _run_script(results, "model-offline", ["tools/verify_model_download.py"])
+    _run_script(results, "translation-guardrails", ["tools/smoke_translation_guardrails.py"])
+    _run_script(results, "regression-workspace", ["tools/smoke_regression_workspace.py"])
     if args.profile != "health":
         _run_script(results, "translator-bilingual", ["tools/smoke_translator.py", "--mode", "bilingual"])
         _run_script(results, "translator-chinese-only", ["tools/smoke_translator.py", "--mode", "chinese_only"])
