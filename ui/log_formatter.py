@@ -53,6 +53,14 @@ def format_run_summary(summary: dict[str, Any]) -> str:
         fallback_text = "，期间曾退回 CPU" if summary.get("cuda_fallback_used") else ""
         lines.append(f"打轴：{backend_label}{elapsed_text}{fallback_text}。")
 
+    density_splits = int(summary.get("subtitle_density_splits") or 0)
+    density_extra_cues = int(summary.get("subtitle_density_extra_cues") or 0)
+    if density_splits:
+        lines.append(
+            f"字幕长度：已自动整理 {density_splits} 条过长字幕，拆成连续短轴"
+            f"（增加 {density_extra_cues} 轴），文字和原时间范围均保留。"
+        )
+
     if summary.get("audio_cache_hit"):
         lines.append("音频：复用缓存，跳过提取和分离。")
     elif summary.get("demucs_skipped"):

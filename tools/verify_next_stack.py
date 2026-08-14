@@ -86,6 +86,7 @@ def main() -> int:
     _add(results, "pipeline-preview", _check_pipeline_preview)
     _run_script(results, "model-offline", ["tools/verify_model_download.py"])
     _run_script(results, "translation-guardrails", ["tools/smoke_translation_guardrails.py"])
+    _run_script(results, "subtitle-density", ["tools/smoke_subtitle_density.py"])
     _run_script(results, "regression-workspace", ["tools/smoke_regression_workspace.py"])
     if args.profile != "health":
         _run_script(results, "translator-bilingual", ["tools/smoke_translator.py", "--mode", "bilingual"])

@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
+from core.subtitle_policy import SubtitleLayoutPolicy, split_timed_subtitle_for_layout
 from utils.ffmpeg_tools import FFmpegAudioProcessor
 
 
@@ -51,6 +52,7 @@ class LiveSubtitleGenerator:
         hardware_mode: str = "low",
         cancel_event: object | None = None,
         progress_cb: ProgressCallback | None = None,
+        layout_policy: SubtitleLayoutPolicy | None = None,
     ) -> str | None:
         self.cancel_event = cancel_event
         started = time.time()
@@ -61,6 +63,8 @@ class LiveSubtitleGenerator:
             "asr_elapsed_seconds": 0,
             "cuda_fallback_used": False,
             "demucs_skipped": skip_separation,
+            "subtitle_density_splits": 0,
+            "subtitle_density_extra_cues": 0,
         }
 
         try:
@@ -83,6 +87,7 @@ class LiveSubtitleGenerator:
                 model_size=model_size,
                 audio_type=audio_type,
                 skipped_demucs=skip_separation,
+                layout_policy=layout_policy,
                 progress_cb=progress_cb,
             )
             self.cleanup_temp_files()
@@ -346,6 +351,7 @@ class LiveSubtitleGenerator:
         audio_type: str = "live",
         skipped_demucs: bool = False,
         progress_cb: ProgressCallback | None = None,
+        layout_policy: SubtitleLayoutPolicy | None = None,
     ) -> str:
         print(f"[ASR] Loading Faster-Whisper model: {model_size}")
         if progress_cb:
@@ -358,7 +364,13 @@ class LiveSubtitleGenerator:
         srt_path = os.path.join(self.subs_dir, f"{self.base_name}_极致打轴.srt")
         print(f"[ASR] Start transcription mode={audio_type}, backend={self.model_backend}")
         try:
-            self._write_transcription_srt(srt_path, audio_type, skipped_demucs, progress_cb)
+            self._write_transcription_srt(
+                srt_path,
+                audio_type,
+                skipped_demucs,
+                progress_cb=progress_cb,
+                layout_policy=layout_policy,
+            )
         except Exception as exc:
             if self.model_backend.startswith("cuda") and self._is_cuda_runtime_error(exc):
                 print(f"[ASR] CUDA runtime failed during transcription: {exc}")
@@ -366,7 +378,13 @@ class LiveSubtitleGenerator:
                 self.cuda_fallback_used = True
                 self._release_model()
                 self.model = self._load_cpu_whisper_model(model_size)
-                self._write_transcription_srt(srt_path, audio_type, skipped_demucs, progress_cb)
+                self._write_transcription_srt(
+                    srt_path,
+                    audio_type,
+                    skipped_demucs,
+                    progress_cb=progress_cb,
+                    layout_policy=layout_policy,
+                )
             else:
                 raise
 
@@ -379,6 +397,7 @@ class LiveSubtitleGenerator:
         audio_type: str,
         skipped_demucs: bool,
         progress_cb: ProgressCallback | None = None,
+        layout_policy: SubtitleLayoutPolicy | None = None,
     ) -> None:
         if self.model is None:
             raise RuntimeError("Whisper model is not loaded.")
@@ -397,6 +416,8 @@ class LiveSubtitleGenerator:
         temp_srt_path = f"{srt_path}.tmp"
         valid_index = 1
         last_logged_pct = -1
+        split_source_segments = 0
+        extra_cues = 0
         with open(temp_srt_path, "w", encoding="utf-8") as srt_file:
             for segment in segments:
                 self._raise_if_cancelled("ASR transcription cancelled")
@@ -412,14 +433,31 @@ class LiveSubtitleGenerator:
                 if self._should_drop_segment(text):
                     continue
 
-                start_val = segment.start
-                end_val = min(segment.end, segment.start + max_duration)
-                srt_file.write(f"{valid_index}\n")
-                srt_file.write(f"{self._format_timestamp(start_val)} --> {self._format_timestamp(end_val)}\n")
-                srt_file.write(f"{text}\n\n")
-                valid_index += 1
+                timed_parts = split_timed_subtitle_for_layout(
+                    text,
+                    segment.start,
+                    segment.end,
+                    layout_policy,
+                )
+                if len(timed_parts) > 1:
+                    split_source_segments += 1
+                    extra_cues += len(timed_parts) - 1
+
+                for part in timed_parts:
+                    start_val = part.start
+                    end_val = part.end
+                    if layout_policy is None or layout_policy.profile not in {"square_safe", "portrait_safe"}:
+                        end_val = min(end_val, start_val + max_duration)
+                    srt_file.write(f"{valid_index}\n")
+                    srt_file.write(f"{self._format_timestamp(start_val)} --> {self._format_timestamp(end_val)}\n")
+                    srt_file.write(f"{part.text}\n\n")
+                    valid_index += 1
 
         os.replace(temp_srt_path, srt_path)
+        self.last_run_summary["subtitle_density_splits"] = split_source_segments
+        self.last_run_summary["subtitle_density_extra_cues"] = extra_cues
+        if split_source_segments:
+            print(f"字幕整理：已自动拆分 {split_source_segments} 条过长字幕，新增 {extra_cues} 个连续时间轴。")
         if valid_index == 1:
             print("[ASR] No valid subtitle segments were emitted.")
 

@@ -121,6 +121,7 @@ def build_pipeline_preview(payload: dict[str, object] | None = None) -> dict[str
             model_ref=model_ref,
             skip_demucs=skip_demucs,
             hardware_mode=hardware_mode,
+            layout_policy=layout_policy,
         )
         asr_cache_hit = bool(_try_reuse_asr(expected_srt, asr_hash_path, asr_hash))
         preview["asr_cache_hit"] = asr_cache_hit
@@ -221,6 +222,7 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
             model_ref=model_ref,
             skip_demucs=skip_demucs,
             hardware_mode=hardware_mode,
+            layout_policy=layout_policy,
         )
 
         print("\n" + "=" * 50)
@@ -251,6 +253,7 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
                 audio_type=audio_type,
                 skip_separation=skip_demucs,
                 hardware_mode=hardware_mode,
+                layout_policy=layout_policy,
                 cancel_event=cancel_event,
                 progress_cb=lambda value, text: msg_queue.put(progress(value, text)),
             )
@@ -644,19 +647,28 @@ def _build_asr_cache_hash(
     model_ref: WhisperModelRef,
     skip_demucs: bool,
     hardware_mode: str,
+    layout_policy: Any | None = None,
 ) -> str:
-    return _hash_payload(
-        {
-            "version": 2,
-            "media": media_fingerprint,
-            "audio_type": audio_type,
-            "model_size": model_size,
-            "model_path": str(model_ref.path),
-            "model_snapshot": model_ref.path.name,
-            "skip_demucs": skip_demucs,
-            "hardware_mode": hardware_mode,
+    payload: dict[str, Any] = {
+        "version": 2,
+        "media": media_fingerprint,
+        "audio_type": audio_type,
+        "model_size": model_size,
+        "model_path": str(model_ref.path),
+        "model_snapshot": model_ref.path.name,
+        "skip_demucs": skip_demucs,
+        "hardware_mode": hardware_mode,
+    }
+    profile = str(getattr(layout_policy, "profile", ""))
+    if profile in {"square_safe", "portrait_safe"}:
+        payload["version"] = 3
+        payload["subtitle_density"] = {
+            "profile": profile,
+            "jp_max_units": int(getattr(layout_policy, "jp_max_units", 0)),
+            "max_visual_lines": 2,
+            "target_duration_seconds": 5,
         }
-    )
+    return _hash_payload(payload)
 
 
 def _build_translation_cache_hash(

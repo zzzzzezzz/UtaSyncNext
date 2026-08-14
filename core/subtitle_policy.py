@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import unicodedata
 from dataclasses import dataclass, replace
@@ -23,6 +24,20 @@ class SubtitleLayoutPolicy:
     ch_max_units: int
     jp_max_units: int
     note: str
+
+
+@dataclass(frozen=True)
+class TimedSubtitlePart:
+    start: float
+    end: float
+    text: str
+
+
+@dataclass(frozen=True)
+class SubtitleDensityMetrics:
+    display_units: int
+    visual_lines: int
+    duration_seconds: float
 
 
 def resolve_subtitle_layout(media_path: str, settings: Mapping[str, Any]) -> SubtitleLayoutPolicy:
@@ -115,6 +130,70 @@ def wrap_ass_text(text: str, max_units: int) -> str:
     parts = str(text or "").split(r"\N")
     wrapped = [_wrap_plain_ass_line(part.strip(), max_units) for part in parts if part.strip()]
     return r"\N".join(wrapped) if wrapped else str(text or "")
+
+
+def measure_subtitle_density(text: str, duration_seconds: float, max_units: int) -> SubtitleDensityMetrics:
+    normalized = str(text or "").replace(r"\N", "\n")
+    visual_lines = 0
+    for line in normalized.splitlines() or [normalized]:
+        units = display_units(line)
+        visual_lines += max(1, math.ceil(units / max(1, max_units)))
+    return SubtitleDensityMetrics(
+        display_units=display_units(normalized),
+        visual_lines=visual_lines,
+        duration_seconds=max(0.0, float(duration_seconds)),
+    )
+
+
+def split_timed_subtitle_for_layout(
+    text: str,
+    start: float,
+    end: float,
+    policy: SubtitleLayoutPolicy | None,
+) -> list[TimedSubtitlePart]:
+    """Split only dense narrow-screen cues while preserving all text and time."""
+    clean_text = str(text or "").strip()
+    start_value = max(0.0, float(start))
+    end_value = max(start_value, float(end))
+    original = [TimedSubtitlePart(start_value, end_value, clean_text)]
+    if not clean_text or policy is None or policy.profile not in {"square_safe", "portrait_safe"}:
+        return original
+
+    metrics = measure_subtitle_density(clean_text, end_value - start_value, policy.jp_max_units)
+    parts_for_lines = math.ceil(metrics.visual_lines / 2)
+    duration_is_dense = (
+        metrics.duration_seconds > 5.0
+        and metrics.display_units >= max(24, int(policy.jp_max_units * 0.75))
+    )
+    parts_for_duration = math.ceil(metrics.duration_seconds / 5.0) if duration_is_dense else 1
+    requested_parts = max(1, parts_for_lines, parts_for_duration)
+
+    # Avoid tiny flashes when a long Whisper segment contains very little text.
+    minimum_part_units = max(20, min(28, policy.jp_max_units // 2))
+    possible_parts = max(1, metrics.display_units // minimum_part_units)
+    part_count = min(requested_parts, possible_parts)
+    if part_count <= 1:
+        return original
+
+    text_parts = _split_text_evenly(clean_text, part_count, max_part_units=policy.jp_max_units * 2)
+    if len(text_parts) <= 1:
+        return original
+
+    weights = [max(1, display_units(part)) for part in text_parts]
+    total_weight = sum(weights)
+    duration = end_value - start_value
+    timed_parts: list[TimedSubtitlePart] = []
+    elapsed_weight = 0
+    for index, (part, weight) in enumerate(zip(text_parts, weights)):
+        part_start = start_value + duration * elapsed_weight / total_weight
+        elapsed_weight += weight
+        part_end = end_value if index == len(text_parts) - 1 else start_value + duration * elapsed_weight / total_weight
+        timed_parts.append(TimedSubtitlePart(part_start, part_end, part))
+    return timed_parts
+
+
+def display_units(text: str) -> int:
+    return sum(_char_units(char) for char in _strip_ass_tags(str(text or "")))
 
 
 def policy_log_line(policy: SubtitleLayoutPolicy) -> str:
@@ -224,12 +303,12 @@ def _probe_video_size(media_path: str) -> tuple[int, int]:
 
 
 def _wrap_plain_ass_line(text: str, max_units: int) -> str:
-    if not text or _display_units(text) <= max_units:
+    if not text or display_units(text) <= max_units:
         return text
 
     lines: list[str] = []
     rest = text
-    while rest and _display_units(rest) > max_units:
+    while rest and display_units(rest) > max_units:
         break_at = _find_break_index(rest, max_units)
         if break_at <= 0:
             break_at = _index_for_units(rest, max_units)
@@ -252,7 +331,7 @@ def _find_break_index(text: str, max_units: int) -> int:
             break
         if char in punctuation or char.isspace():
             best = index + 1
-    if best > 0 and _display_units(text[:best]) >= max_units * 0.45:
+    if best > 0 and display_units(text[:best]) >= max_units * 0.45:
         return best
     return -1
 
@@ -266,8 +345,69 @@ def _index_for_units(text: str, max_units: int) -> int:
     return len(text)
 
 
-def _display_units(text: str) -> int:
-    return sum(_char_units(char) for char in _strip_ass_tags(text))
+def _split_text_evenly(text: str, part_count: int, max_part_units: int | None = None) -> list[str]:
+    parts: list[str] = []
+    rest = text.strip()
+    remaining_parts = part_count
+    while rest and remaining_parts > 1:
+        rest_units = display_units(rest)
+        target_units = max(1, math.ceil(rest_units / remaining_parts))
+        minimum_head_units = 1
+        if max_part_units:
+            minimum_head_units = max(1, rest_units - max_part_units * (remaining_parts - 1))
+            target_units = min(max_part_units, max(target_units, minimum_head_units))
+        break_at = _find_balanced_break_index(
+            rest,
+            target_units,
+            minimum_units=minimum_head_units,
+            maximum_units=max_part_units,
+        )
+        if break_at <= 0:
+            break_at = _index_for_units(rest, target_units)
+        head = rest[:break_at]
+        if not head.strip():
+            break
+        parts.append(head)
+        rest = rest[break_at:]
+        remaining_parts -= 1
+    if rest:
+        parts.append(rest)
+    return parts
+
+
+def _find_balanced_break_index(
+    text: str,
+    target_units: int,
+    *,
+    minimum_units: int = 1,
+    maximum_units: int | None = None,
+) -> int:
+    primary_candidates: list[tuple[int, int]] = []
+    japanese_candidates: list[tuple[int, int]] = []
+    units = 0
+    punctuation = "、。！？!?，,；;：:)]）】」』"
+    japanese_boundaries = ("から", "ので", "けど", "って", "たり", "して", "ても", "のに", "なら", "では", "には")
+    japanese_particles = "はがをにでとへも"
+    lower = max(minimum_units, int(target_units * 0.55))
+    upper = max(lower, int(target_units * 1.45))
+    if maximum_units:
+        upper = min(upper, maximum_units)
+    for index, char in enumerate(text):
+        units += _char_units(char)
+        if units > upper:
+            break
+        if units >= lower and (char in punctuation or char.isspace()):
+            primary_candidates.append((abs(units - target_units), index + 1))
+        prefix = text[: index + 1]
+        if units >= lower and (
+            char in japanese_particles or any(prefix.endswith(boundary) for boundary in japanese_boundaries)
+        ):
+            japanese_candidates.append((abs(units - target_units), index + 1))
+    if primary_candidates:
+        return min(primary_candidates)[1]
+    if japanese_candidates:
+        return min(japanese_candidates)[1]
+    return -1
 
 
 def _char_units(char: str) -> int:
