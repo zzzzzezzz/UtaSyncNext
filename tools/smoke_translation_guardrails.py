@@ -9,7 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.translator import SrtBlock, SubtitleTranslator, _suspected_speaker_labels
+from core.translator import (
+    SrtBlock,
+    SubtitleTranslator,
+    _strip_known_speaker_labels,
+    _suspected_speaker_labels,
+)
 from ui.log_formatter import format_run_summary
 
 
@@ -67,6 +72,19 @@ def main() -> int:
         print(f"[FAIL] English lyric refrains were treated as speaker labels: {lyric_refrains}")
         return 1
 
+    cleaned, removed = _strip_known_speaker_labels(
+        "1\n00:00:01,000 --> 00:00:02,000\nヤンヤン 結構印象あります 深井 マジで？\n"
+        "2\n00:00:02,000 --> 00:00:03,000\n樋口：三次啊w\n"
+        "3\n00:00:03,000 --> 00:00:04,000\n神谷です。神谷 さんもいます。\n"
+        "4\n00:00:04,000 --> 00:00:05,000\nFANTASY FANTASY\nTwilight 君だけを見て"
+    )
+    if removed != 3 or any(label in cleaned for label in ["ヤンヤン", "深井", "樋口"]):
+        print(f"[FAIL] High-confidence speaker labels were not cleaned safely: removed={removed}\n{cleaned}")
+        return 1
+    if "神谷です" not in cleaned or "神谷 さん" not in cleaned or "FANTASY" not in cleaned or "Twilight" not in cleaned:
+        print(f"[FAIL] Natural names or lyric words were removed by speaker cleanup:\n{cleaned}")
+        return 1
+
     translator.layout_profile = "wide_16_9"
     translator.ch_max_units = 64
     translator.jp_max_units = 84
@@ -99,9 +117,16 @@ def main() -> int:
             "translation_requested": True,
             "translation_alignment_fallbacks": 1,
             "translation_speaker_label_warnings": 2,
+            "translation_speaker_labels_removed": 3,
+            "translation_model": "deepseek-ai/DeepSeek-V3",
         }
     )
-    if "已保留该处原文" not in summary or "疑似说话人冠名" not in summary:
+    if (
+        "已保留该处原文" not in summary
+        or "疑似说话人冠名" not in summary
+        or "已移除 3 处高置信角色标签" not in summary
+        or "DeepSeek-V3" not in summary
+    ):
         print("[FAIL] User-facing summary does not explain translation guardrail results.")
         return 1
 

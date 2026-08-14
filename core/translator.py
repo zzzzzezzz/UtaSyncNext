@@ -14,7 +14,8 @@ from typing import Callable
 
 
 ProgressCallback = Callable[[float, str], None]
-PROMPT_POLICY_VERSION = "next-v7-timeline-speaker-lyric-name-guardrails"
+PROMPT_POLICY_VERSION = "next-v8-user-model-speaker-cleanup"
+API_REQUEST_TIMEOUT_SECONDS = 180.0
 SPEAKER_COLON_RE = re.compile(
     r"^(?P<label>[A-Za-z][A-Za-z0-9_. -]{1,24}|[\u3400-\u9fff\u3040-\u30ffー]{2,8})\s*[:：]"
 )
@@ -32,6 +33,12 @@ KNOWN_SPEAKER_LABELS = {
     "とみたけ",
     "ヤンヤン",
 }
+KNOWN_SPEAKER_TOKEN_RE = re.compile(
+    rf"(?P<prefix>^|\s)(?P<label>{'|'.join(re.escape(label) for label in sorted(KNOWN_SPEAKER_LABELS, key=len, reverse=True))})"
+    r"(?P<separator>\s*[:：]\s*|\s+)",
+    re.IGNORECASE,
+)
+SPEAKER_HONORIFIC_RE = re.compile(r"^(?:さん|くん|ちゃん|氏|先生|様)")
 
 
 @dataclass(frozen=True)
@@ -100,12 +107,17 @@ class SubtitleTranslator:
         self.api_calls = 0
         self.alignment_fallbacks = 0
         self.speaker_label_warnings = 0
+        self.speaker_labels_removed = 0
+        self.active_model = self.primary_model
+        self.returned_models: set[str] = set()
         self.api_trace: dict[str, object] = {}
         self.api_trace_announced = False
 
         client_kwargs = {
             "api_key": api_key,
             "base_url": base_url,
+            "timeout": API_REQUEST_TIMEOUT_SECONDS,
+            "max_retries": 0,
         }
         http_client = _build_http_client(proxy_url)
         if http_client is not None:
@@ -115,14 +127,21 @@ class SubtitleTranslator:
 
     def run(self, cancel_event=None, progress_cb: ProgressCallback | None = None) -> str | None:
         self.cancel_event = cancel_event
+        self.failed_batches = 0
+        self.total_batches = 0
         self.cache_hits = 0
         self.api_calls = 0
-        self._start_api_trace()
+        self.alignment_fallbacks = 0
+        self.speaker_label_warnings = 0
+        self.speaker_labels_removed = 0
+        self.returned_models.clear()
         print("\n[Next 翻译阶段] 启动独立大模型翻译器...")
 
         try:
             start_time = time.time()
             reference_lyrics = self.read_reference_lyrics()
+            self.active_model = self.primary_model if reference_lyrics else self.reasoning_model
+            self._start_api_trace(self.active_model, bool(reference_lyrics))
             blocks = self.parse_srt()
             if not blocks:
                 raise RuntimeError("输入 SRT 为空或格式无效。")
@@ -214,7 +233,8 @@ class SubtitleTranslator:
         if total_batches == 0:
             return ""
 
-        active_model = self.primary_model if reference_lyrics else self.reasoning_model
+        active_model = self.active_model
+        print(f"   -> 本次翻译模型: {active_model}")
         print(f"   -> 启动翻译队列，并发 {self.max_workers}，共 {total_batches} 个批次。")
 
         results: list[tuple[int, str]] = []
@@ -281,9 +301,19 @@ class SubtitleTranslator:
         original_batch_srt = _blocks_to_srt(batch)
         if isinstance(cached, str) and cached.strip() and not _same_subtitle_payload(cached, original_batch_srt):
             self.cache_hits += 1
+            self._record_cache_hit(target_model, batch_idx)
             return batch_idx, cached
 
-        prompt = self._build_prompt(original_batch_srt, prev_context, reference_lyrics)
+        prompt_batch_srt, source_labels_removed = _strip_known_speaker_labels(original_batch_srt)
+        if source_labels_removed:
+            with self.failure_lock:
+                self.speaker_labels_removed += source_labels_removed
+            print(
+                f"      批次 {batch_idx + 1}/{total_batches} 已从识别稿清理 "
+                f"{source_labels_removed} 处高置信角色标签。"
+            )
+        prompt_context, _ = _strip_known_speaker_labels(prev_context)
+        prompt = self._build_prompt(prompt_batch_srt, prompt_context, reference_lyrics)
         max_retries = 4
         speaker_cleanup_retry = False
 
@@ -318,6 +348,13 @@ class SubtitleTranslator:
                     raise RuntimeError("API 返回触发长度限制，结果可能残缺。")
 
                 result_text = _clean_model_output(choice.message.content or "")
+                result_text, removed_labels = _strip_known_speaker_labels(result_text)
+                if removed_labels:
+                    with self.failure_lock:
+                        self.speaker_labels_removed += removed_labels
+                    print(
+                        f"      批次 {batch_idx + 1}/{total_batches} 已清理 {removed_labels} 处高置信角色标签。"
+                    )
                 if not _looks_like_srt(result_text):
                     raise RuntimeError("API 没有返回有效 SRT。")
                 if result_text.count("-->") < max(1, len(batch) * 0.6):
@@ -568,17 +605,21 @@ class SubtitleTranslator:
             except Exception:
                 pass
 
-    def _start_api_trace(self) -> None:
+    def _start_api_trace(self, active_model: str, reference_lyrics_present: bool) -> None:
         started_at = _utc_now()
         with self.api_trace_lock:
             self.api_trace = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "status": "running",
                 "started_at": started_at,
                 "finished_at": None,
                 "prompt_policy": PROMPT_POLICY_VERSION,
+                "model_policy": "user_selected_v1",
                 "api_base_url": self.base_url,
-                "requested_model": self.primary_model,
+                "request_timeout_seconds": API_REQUEST_TIMEOUT_SECONDS,
+                "configured_model": self.primary_model,
+                "requested_model": active_model,
+                "reference_lyrics_present": reference_lyrics_present,
                 "output_mode": self.output_mode,
                 "layout_profile": self.layout_profile,
                 "ch_max_units": self.ch_max_units,
@@ -608,6 +649,9 @@ class SubtitleTranslator:
             },
         }
         with self.api_trace_lock:
+            returned_model = str(entry["returned_model"] or "").strip()
+            if returned_model:
+                self.returned_models.add(returned_model)
             calls = self.api_trace.setdefault("calls", [])
             if isinstance(calls, list):
                 calls.append(entry)
@@ -615,6 +659,23 @@ class SubtitleTranslator:
             if not self.api_trace_announced:
                 returned_model = entry["returned_model"] or requested_model
                 print(f"   -> 翻译服务已确认: {returned_model}")
+                print(f"   -> 调用记录已保存: {self.api_trace_file}")
+                self.api_trace_announced = True
+
+    def _record_cache_hit(self, requested_model: str, batch_idx: int) -> None:
+        entry = {
+            "event": "cache_hit",
+            "received_at": _utc_now(),
+            "batch": batch_idx + 1,
+            "requested_model": requested_model,
+        }
+        with self.api_trace_lock:
+            calls = self.api_trace.setdefault("calls", [])
+            if isinstance(calls, list):
+                calls.append(entry)
+            self._write_api_trace_locked()
+            if not self.api_trace_announced:
+                print(f"   -> 本次复用 {requested_model} 的翻译缓存。")
                 print(f"   -> 调用记录已保存: {self.api_trace_file}")
                 self.api_trace_announced = True
 
@@ -643,6 +704,8 @@ class SubtitleTranslator:
             self.api_trace["cache_hits"] = self.cache_hits
             self.api_trace["api_calls"] = self.api_calls
             self.api_trace["failed_batches"] = self.failed_batches
+            self.api_trace["speaker_labels_removed"] = self.speaker_labels_removed
+            self.api_trace["returned_models"] = sorted(self.returned_models)
             if error:
                 safe_error = error.replace(self.api_key, "[REDACTED]") if self.api_key else error
                 self.api_trace["final_error"] = safe_error[:1000]
@@ -749,6 +812,28 @@ def _suspected_speaker_labels(content: str) -> list[str]:
         if bare and bare.group("label").strip().casefold() in KNOWN_SPEAKER_LABELS:
             labels.add(bare.group("label").strip())
     return sorted(labels, key=str.casefold)
+
+
+def _strip_known_speaker_labels(content: str) -> tuple[str, int]:
+    removed = 0
+    cleaned_lines: list[str] = []
+    for line in str(content or "").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.isdigit() or "-->" in stripped:
+            cleaned_lines.append(line)
+            continue
+
+        def replace_label(match: re.Match[str]) -> str:
+            nonlocal removed
+            following = line[match.end() :].lstrip()
+            if SPEAKER_HONORIFIC_RE.match(following):
+                return match.group(0)
+            removed += 1
+            return match.group("prefix")
+
+        cleaned = KNOWN_SPEAKER_TOKEN_RE.sub(replace_label, line)
+        cleaned_lines.append(re.sub(r"[ \t]{2,}", " ", cleaned).strip())
+    return "\n".join(cleaned_lines), removed
 
 
 def _blocks_to_srt(blocks: list[SrtBlock]) -> str:

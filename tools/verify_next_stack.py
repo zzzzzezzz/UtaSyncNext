@@ -82,6 +82,7 @@ def main() -> int:
     _add(results, "legacy-scan", _scan_legacy_wrappers)
     _add(results, "audio-cache-policy", _check_audio_cache_policy)
     _add(results, "demucs-setting-policy", _check_demucs_setting_policy)
+    _add(results, "translation-model-policy", _check_translation_model_policy)
     _add(results, "pipeline-cache-fingerprint", _check_pipeline_cache_fingerprint)
     _add(results, "pipeline-preview", _check_pipeline_preview)
     _run_script(results, "model-offline", ["tools/verify_model_download.py"])
@@ -342,8 +343,41 @@ def _check_demucs_setting_policy() -> str:
     return "Demucs defaults favor fast skip while explicit high-quality mode remains available"
 
 
+def _check_translation_model_policy() -> str:
+    from engine.pipeline_worker import _build_translation_cache_hash, _translation_models_for
+
+    for selected in ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-R1", "gemini-2.5-flash"]:
+        primary, no_lyrics = _translation_models_for(selected)
+        if primary != selected or no_lyrics != selected:
+            raise AssertionError(f"user-selected model was silently replaced: {selected} -> {(primary, no_lyrics)}")
+
+    common = {
+        "media_fingerprint": {"path": "fixture.mp4", "size": 1},
+        "source_srt": None,
+        "lyrics_text": "",
+        "output_mode": "bilingual",
+    }
+    v3_hash = _build_translation_cache_hash(
+        **common,
+        settings={"api_url": "https://example.invalid/v1", "api_model": "deepseek-ai/DeepSeek-V3"},
+    )
+    r1_hash = _build_translation_cache_hash(
+        **common,
+        settings={"api_url": "https://example.invalid/v1", "api_model": "deepseek-ai/DeepSeek-R1"},
+    )
+    if v3_hash == r1_hash:
+        raise AssertionError("V3 and R1 translation caches must not share a fingerprint")
+    return "configured model is honored with and without lyrics; model caches remain isolated"
+
+
 def _check_pipeline_cache_fingerprint() -> str:
-    from engine.pipeline_worker import _file_content_hash, _hash_payload, _media_fingerprint, _try_reuse_asr
+    from engine.pipeline_worker import (
+        _file_content_hash,
+        _hash_payload,
+        _invalidate_translation_completion,
+        _media_fingerprint,
+        _try_reuse_asr,
+    )
 
     with tempfile.TemporaryDirectory(prefix="utasyncnext-cache-fingerprint-") as temp_dir:
         root = Path(temp_dir)
@@ -376,7 +410,18 @@ def _check_pipeline_cache_fingerprint() -> str:
         if _try_reuse_asr(srt, hash_path, asr_c):
             raise AssertionError("ASR cache should not be reused when hash differs")
 
-    return "media, model, and SRT content changes invalidate pipeline caches"
+        translation_cache = root / "translation-cache.json"
+        translation_marker = root / "translation.hash"
+        translation_cache.write_text('{"completed-batch": "subtitle"}', encoding="utf-8")
+        translation_marker.write_text("old-run", encoding="utf-8")
+        if not _invalidate_translation_completion(translation_marker, "new-run"):
+            raise AssertionError("stale completed-translation marker should be invalidated")
+        if translation_marker.exists():
+            raise AssertionError("stale completed-translation marker was not removed")
+        if not translation_cache.exists():
+            raise AssertionError("partial batch cache must survive so failed translation can resume")
+
+    return "media/model/SRT changes invalidate completion markers while partial translation batches survive"
 
 
 def _check_pipeline_preview() -> str:

@@ -74,7 +74,8 @@ def format_run_summary(summary: dict[str, Any]) -> str:
         cache_hits = int(summary.get("translation_cache_hits") or 0)
         api_calls = int(summary.get("translation_api_calls") or 0)
         failed = int(summary.get("translation_failed_batches") or 0)
-        parts = ["调用翻译接口"]
+        translation_model = str(summary.get("translation_model") or "").strip()
+        parts = [f"使用 {translation_model}" if translation_model else "调用翻译接口"]
         if translation_elapsed:
             parts.append(f"耗时 {translation_elapsed}")
         if batches:
@@ -87,11 +88,14 @@ def format_run_summary(summary: dict[str, Any]) -> str:
             parts.append(f"失败 {failed} 批")
         lines.append("翻译：" + "，".join(parts) + "。")
         alignment_fallbacks = int(summary.get("translation_alignment_fallbacks") or 0)
+        removed_labels = int(summary.get("translation_speaker_labels_removed") or 0)
         speaker_warnings = int(summary.get("translation_speaker_label_warnings") or 0)
         if alignment_fallbacks:
             lines.append(
                 f"翻译保护：有 {alignment_fallbacks} 条内容未能可靠对应，已保留该处原文，后续字幕没有顺移。"
             )
+        if removed_labels:
+            lines.append(f"对谈清理：已移除 {removed_labels} 处高置信角色标签。")
         if speaker_warnings:
             lines.append(f"复核提醒：仍检测到 {speaker_warnings} 类疑似说话人冠名，请检查对应字幕。")
     else:

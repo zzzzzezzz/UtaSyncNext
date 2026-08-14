@@ -28,6 +28,7 @@ SAMPLE_SRT = """1
 
 class FakeOpenAIHandler(BaseHTTPRequestHandler):
     server_version = "UtaSyncFakeOpenAI/1.0"
+    request_models: list[str] = []
 
     def log_message(self, format: str, *args) -> None:
         return
@@ -44,6 +45,8 @@ class FakeOpenAIHandler(BaseHTTPRequestHandler):
         except Exception:
             self.send_error(400)
             return
+
+        self.request_models.append(str(payload.get("model") or ""))
 
         content = _translate_prompt(str(payload.get("messages", [{}])[-1].get("content", "")))
         response = {
@@ -89,6 +92,7 @@ def main() -> int:
         lyrics_path.write_text("ねえ、もしも全て投げ捨てられたら\n笑って生きることが楽になるの?", encoding="utf-8")
 
         server = ThreadingHTTPServer(("127.0.0.1", 0), FakeOpenAIHandler)
+        FakeOpenAIHandler.request_models = []
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
 
@@ -106,12 +110,37 @@ def main() -> int:
                 proxy_url="",
             )
             output = translator.run(progress_cb=lambda value, text: progress_events.append((value, text)))
+
+            blind_srt_path = temp_root / "blind_极致打轴.srt"
+            blind_srt_path.write_text(SAMPLE_SRT, encoding="utf-8")
+            blind_translator = SubtitleTranslator(
+                api_key="fake-key",
+                base_url=base_url,
+                primary_model="fake-primary",
+                reasoning_model="fake-primary",
+                srt_path=str(blind_srt_path),
+                reference_txt_path=None,
+                output_mode=args.mode,
+                proxy_url="",
+            )
+            blind_output = blind_translator.run()
+            requests_after_api_run = len(FakeOpenAIHandler.request_models)
+            blind_cached_output = blind_translator.run()
         finally:
             server.shutdown()
             server.server_close()
 
         if not output:
             print("[FAIL] translator returned no output")
+            return 1
+        if not blind_output or not blind_cached_output:
+            print("[FAIL] no-lyrics or cached translator run returned no output")
+            return 1
+        if FakeOpenAIHandler.request_models != ["fake-primary", "fake-primary"]:
+            print(f"[FAIL] translator did not honor the selected model: {FakeOpenAIHandler.request_models}")
+            return 1
+        if len(FakeOpenAIHandler.request_models) != requests_after_api_run:
+            print("[FAIL] cached translator run unexpectedly called the API")
             return 1
 
         output_path = Path(output)
@@ -149,6 +178,16 @@ def main() -> int:
             return 1
         if "fake-key" in trace_path.read_text(encoding="utf-8"):
             print("[FAIL] API trace leaked the API key")
+            return 1
+
+        blind_trace_path = blind_srt_path.with_name(f"{blind_srt_path.stem}_api_trace.json")
+        blind_trace = json.loads(blind_trace_path.read_text(encoding="utf-8"))
+        cache_events = [entry for entry in blind_trace.get("calls", []) if entry.get("event") == "cache_hit"]
+        if blind_trace.get("requested_model") != "fake-primary" or blind_trace.get("reference_lyrics_present") is not False:
+            print(f"[FAIL] no-lyrics trace does not record the effective model: {blind_trace}")
+            return 1
+        if blind_trace.get("api_calls") != 0 or not cache_events:
+            print(f"[FAIL] cached trace does not contain cache-hit evidence: {blind_trace}")
             return 1
 
         print("[PASS] Next-native translator smoke test passed")

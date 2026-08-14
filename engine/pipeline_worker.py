@@ -197,6 +197,9 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
             "translation_failed_batches": 0,
             "translation_alignment_fallbacks": 0,
             "translation_speaker_label_warnings": 0,
+            "translation_speaker_labels_removed": 0,
+            "translation_model": api_model if api_key else "",
+            "translation_returned_models": [],
             "ass_generated": False,
             "cuda_fallback_used": False,
             "layout_profile": layout_policy.profile,
@@ -211,7 +214,6 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
         expected_srt = subtitles_dir / f"{base_name}_极致打轴.srt"
         asr_hash_path = subtitles_dir / f"{base_name}_打轴指纹.hash"
         trans_hash_path = subtitles_dir / f"{base_name}_翻译指纹.hash"
-        trans_cache_path = subtitles_dir / f"{base_name}_极致打轴_翻译缓存.json"
 
         model_ref = _resolve_whisper_model_arg(model_size)
         media_fingerprint = _media_fingerprint(media_path)
@@ -274,9 +276,7 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
             settings=settings,
             layout_policy=layout_policy,
         )
-        if _read_text(trans_hash_path) != trans_hash:
-            _safe_unlink(trans_cache_path)
-            _safe_unlink(trans_hash_path)
+        _invalidate_translation_completion(trans_hash_path, trans_hash)
 
         final_srt = srt_path
         final_ass: str | None = None
@@ -287,12 +287,12 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
             temp_lyrics_path = output_dir / "temp_lyrics_next.txt"
             temp_lyrics_path.write_text(lyrics_text, encoding="utf-8")
 
-            reasoning_model = _reasoning_model_for(api_model)
+            primary_model, reasoning_model = _translation_models_for(api_model)
             translation_started_at = time.time()
             translator = SubtitleTranslator(
                 api_key=api_key,
                 base_url=str(settings.get("api_url") or "https://api.siliconflow.cn/v1").strip(),
-                primary_model=api_model,
+                primary_model=primary_model,
                 reasoning_model=reasoning_model,
                 srt_path=str(srt_path),
                 reference_txt_path=str(temp_lyrics_path),
@@ -315,6 +315,13 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
                     "translation_api_calls": int(getattr(translator, "api_calls", 0) or 0),
                     "translation_failed_batches": int(getattr(translator, "failed_batches", 0) or 0),
                     "translation_alignment_fallbacks": int(getattr(translator, "alignment_fallbacks", 0) or 0),
+                    "translation_model": str(getattr(translator, "active_model", primary_model) or primary_model),
+                    "translation_returned_models": sorted(
+                        str(model) for model in (getattr(translator, "returned_models", set()) or set()) if model
+                    ),
+                    "translation_speaker_labels_removed": int(
+                        getattr(translator, "speaker_labels_removed", 0) or 0
+                    ),
                     "translation_speaker_label_warnings": int(
                         getattr(translator, "speaker_label_warnings", 0) or 0
                     ),
@@ -627,12 +634,9 @@ def _is_valid_srt(path: str | Path | None) -> bool:
         return False
 
 
-def _reasoning_model_for(model: str) -> str:
-    if "gemini-2.5-flash" in model:
-        return "gemini-2.5-pro"
-    if "DeepSeek-V3" in model:
-        return "deepseek-ai/DeepSeek-R1"
-    return model
+def _translation_models_for(model: str) -> tuple[str, str]:
+    selected = str(model or "").strip() or "deepseek-ai/DeepSeek-V3"
+    return selected, selected
 
 
 def _hash_text(text: str) -> str:
@@ -689,16 +693,27 @@ def _build_translation_cache_hash(
         }
     return _hash_payload(
         {
-            "version": 7,
+            "version": 8,
             "media": media_fingerprint,
             "source_srt": _file_content_hash(source_srt),
             "lyrics": lyrics_text,
             "output_mode": output_mode,
             "api_url": settings.get("api_url"),
             "api_model": settings.get("api_model"),
+            "model_policy": "user_selected_v1",
             "layout": layout_payload,
         }
     )
+
+
+def _invalidate_translation_completion(hash_path: str | Path, expected_hash: str) -> bool:
+    marker_path = Path(hash_path)
+    if _read_text(marker_path) == expected_hash:
+        return False
+    # Batch cache keys already include source text, model, prompt policy, lyrics,
+    # layout and title. Keep valid completed batches so failed jobs can resume.
+    _safe_unlink(marker_path)
+    return True
 
 
 def _hash_payload(payload: dict[str, Any]) -> str:
