@@ -50,6 +50,13 @@ class FakeOpenAIHandler(BaseHTTPRequestHandler):
             "id": "chatcmpl-utasync-smoke",
             "object": "chat.completion",
             "model": payload.get("model", "fake-model"),
+            "created": 1770000000,
+            "system_fingerprint": "fp_utasync_smoke",
+            "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+            },
             "choices": [
                 {
                     "index": 0,
@@ -123,6 +130,25 @@ def main() -> int:
             return 1
         if not progress_events:
             print("[FAIL] progress callback was not called")
+            return 1
+
+        trace_path = srt_path.with_name(f"{srt_path.stem}_api_trace.json")
+        if not trace_path.exists():
+            print("[FAIL] API trace file was not created")
+            return 1
+        trace = json.loads(trace_path.read_text(encoding="utf-8"))
+        responses = [entry for entry in trace.get("calls", []) if entry.get("event") == "response"]
+        if trace.get("status") != "completed" or not responses:
+            print("[FAIL] API trace did not record a completed response")
+            return 1
+        if responses[0].get("system_fingerprint") != "fp_utasync_smoke":
+            print("[FAIL] API trace did not preserve the system fingerprint")
+            return 1
+        if responses[0].get("usage", {}).get("total_tokens") != 150:
+            print("[FAIL] API trace did not preserve token usage")
+            return 1
+        if "fake-key" in trace_path.read_text(encoding="utf-8"):
+            print("[FAIL] API trace leaked the API key")
             return 1
 
         print("[PASS] Next-native translator smoke test passed")

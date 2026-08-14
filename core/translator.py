@@ -8,6 +8,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -86,8 +87,10 @@ class SubtitleTranslator:
         suffix = "纯中文字幕" if self.output_mode == "chinese_only" else "双语字幕"
         self.output_srt_path = str(base_path.with_name(f"{base_path.name}_{suffix}.srt"))
         self.cache_file = base_path.with_name(f"{base_path.name}_翻译缓存.json")
+        self.api_trace_file = base_path.with_name(f"{base_path.name}_api_trace.json")
         self.cache_lock = threading.Lock()
         self.failure_lock = threading.Lock()
+        self.api_trace_lock = threading.Lock()
         self.translation_cache = self._load_cache()
         self.failed_batches = 0
         self.total_batches = 0
@@ -95,6 +98,8 @@ class SubtitleTranslator:
         self.api_calls = 0
         self.alignment_fallbacks = 0
         self.speaker_label_warnings = 0
+        self.api_trace: dict[str, object] = {}
+        self.api_trace_announced = False
 
         client_kwargs = {
             "api_key": api_key,
@@ -110,6 +115,7 @@ class SubtitleTranslator:
         self.cancel_event = cancel_event
         self.cache_hits = 0
         self.api_calls = 0
+        self._start_api_trace()
         print("\n[Next 翻译阶段] 启动独立大模型翻译器...")
 
         try:
@@ -136,10 +142,12 @@ class SubtitleTranslator:
             elapsed = int(time.time() - start_time)
             print(f"[完成] Next 翻译完成，耗时 {elapsed} 秒。")
             print(f"[输出] 翻译字幕已保存: {output_path}")
+            self._finish_api_trace("completed")
             if progress_cb:
                 progress_cb(0.90, "翻译排版完成")
             return str(output_path)
         except Exception as exc:
+            self._finish_api_trace("failed", str(exc))
             if "用户中断" not in str(exc):
                 print(f"\n[错误] 翻译阶段失败: {exc}")
                 print("[建议] 检查 API Key、Base URL、模型名或代理设置后重试；已完成批次会保留缓存。")
@@ -301,6 +309,7 @@ class SubtitleTranslator:
                     temperature=0.1,
                     max_tokens=8192,
                 )
+                self._record_api_response(response, target_model, batch_idx, attempt)
                 choice = response.choices[0]
                 if getattr(choice, "finish_reason", "") == "length":
                     raise RuntimeError("API 返回触发长度限制，结果可能残缺。")
@@ -332,6 +341,7 @@ class SubtitleTranslator:
                 return batch_idx, restored
             except Exception as exc:
                 message = str(exc)
+                self._record_api_error(message, target_model, batch_idx, attempt)
                 if "用户中断" in message or "401" in message or "403" in message:
                     raise
 
@@ -541,6 +551,94 @@ class SubtitleTranslator:
             except Exception:
                 pass
 
+    def _start_api_trace(self) -> None:
+        started_at = _utc_now()
+        with self.api_trace_lock:
+            self.api_trace = {
+                "schema_version": 1,
+                "status": "running",
+                "started_at": started_at,
+                "finished_at": None,
+                "prompt_policy": PROMPT_POLICY_VERSION,
+                "api_base_url": self.base_url,
+                "requested_model": self.primary_model,
+                "output_mode": self.output_mode,
+                "layout_profile": self.layout_profile,
+                "ch_max_units": self.ch_max_units,
+                "jp_max_units": self.jp_max_units,
+                "calls": [],
+            }
+            self.api_trace_announced = False
+            self._write_api_trace_locked()
+
+    def _record_api_response(self, response, requested_model: str, batch_idx: int, attempt: int) -> None:
+        usage = getattr(response, "usage", None)
+        entry = {
+            "event": "response",
+            "received_at": _utc_now(),
+            "batch": batch_idx + 1,
+            "attempt": attempt + 1,
+            "requested_model": requested_model,
+            "returned_model": str(getattr(response, "model", "") or ""),
+            "response_id": str(getattr(response, "id", "") or ""),
+            "system_fingerprint": str(getattr(response, "system_fingerprint", "") or ""),
+            "created": getattr(response, "created", None),
+            "usage": {
+                "prompt_tokens": getattr(usage, "prompt_tokens", None),
+                "completion_tokens": getattr(usage, "completion_tokens", None),
+                "total_tokens": getattr(usage, "total_tokens", None),
+            },
+        }
+        with self.api_trace_lock:
+            calls = self.api_trace.setdefault("calls", [])
+            if isinstance(calls, list):
+                calls.append(entry)
+            self._write_api_trace_locked()
+            if not self.api_trace_announced:
+                returned_model = entry["returned_model"] or requested_model
+                print(f"   -> 翻译服务已确认: {returned_model}")
+                print(f"   -> 调用记录已保存: {self.api_trace_file}")
+                self.api_trace_announced = True
+
+    def _record_api_error(self, message: str, requested_model: str, batch_idx: int, attempt: int) -> None:
+        safe_message = str(message or "unknown error")
+        if self.api_key:
+            safe_message = safe_message.replace(self.api_key, "[REDACTED]")
+        entry = {
+            "event": "error",
+            "received_at": _utc_now(),
+            "batch": batch_idx + 1,
+            "attempt": attempt + 1,
+            "requested_model": requested_model,
+            "message": safe_message[:1000],
+        }
+        with self.api_trace_lock:
+            calls = self.api_trace.setdefault("calls", [])
+            if isinstance(calls, list):
+                calls.append(entry)
+            self._write_api_trace_locked()
+
+    def _finish_api_trace(self, status: str, error: str = "") -> None:
+        with self.api_trace_lock:
+            self.api_trace["status"] = status
+            self.api_trace["finished_at"] = _utc_now()
+            self.api_trace["cache_hits"] = self.cache_hits
+            self.api_trace["api_calls"] = self.api_calls
+            self.api_trace["failed_batches"] = self.failed_batches
+            if error:
+                safe_error = error.replace(self.api_key, "[REDACTED]") if self.api_key else error
+                self.api_trace["final_error"] = safe_error[:1000]
+            self._write_api_trace_locked()
+
+    def _write_api_trace_locked(self) -> None:
+        try:
+            self.api_trace_file.parent.mkdir(parents=True, exist_ok=True)
+            temp_path = self.api_trace_file.with_suffix(self.api_trace_file.suffix + ".tmp")
+            temp_path.write_text(json.dumps(self.api_trace, ensure_ascii=False, indent=2), encoding="utf-8")
+            temp_path.replace(self.api_trace_file)
+        except Exception:
+            pass
+
 
 def _build_http_client(proxy_url: str):
     proxy = _normalize_proxy_url(proxy_url)
@@ -563,6 +661,10 @@ def _build_http_client(proxy_url: str):
     except Exception as exc:
         print(f"   -> 翻译代理初始化失败，已切回直连: {exc}")
     return None
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _normalize_proxy_url(proxy_url: str) -> str:

@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from core.subtitle_policy import resolve_subtitle_layout
 from core.translator import SubtitleTranslator
 from utils.config import load_settings
 
@@ -18,6 +19,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run a real API translation smoke test on an existing SRT.")
     parser.add_argument("--srt", required=True, help="Input SRT path.")
     parser.add_argument("--lyrics", default="", help="Optional reference lyrics text file.")
+    parser.add_argument("--media", default="", help="Optional source media path for the real layout policy.")
     parser.add_argument("--mode", choices=["bilingual", "chinese_only"], default="bilingual")
     parser.add_argument("--proxy", default=None, help="Override API proxy. Use 10808 for local port-only proxy.")
     parser.add_argument("--in-place", action="store_true", help="Translate next to the input SRT instead of a temp copy.")
@@ -40,6 +42,10 @@ def main() -> int:
         return 1
 
     lyrics_path = Path(args.lyrics).resolve() if args.lyrics else None
+    media_path = Path(args.media).resolve() if args.media else None
+    if media_path is not None and not media_path.is_file():
+        print(f"FAIL: media not found: {media_path}")
+        return 1
     temp_dir: tempfile.TemporaryDirectory[str] | None = None
     if args.in_place:
         work_srt = source_srt
@@ -57,6 +63,7 @@ def main() -> int:
 
     original_cues = _count_cues(source_srt)
     proxy_url = args.proxy if args.proxy is not None else str(settings.get("proxy_url") or "").strip()
+    layout_policy = resolve_subtitle_layout(str(media_path), settings) if media_path else None
     print("REAL_TRANSLATION_CONFIG")
     print(f"api_url={api_url}")
     print(f"api_model={api_model}")
@@ -64,7 +71,10 @@ def main() -> int:
     print(f"proxy={proxy_url or '(empty)'}")
     print(f"mode={args.mode}")
     print(f"input_cues={original_cues}")
-    print(f"lyrics_present={bool(lyrics_path and lyrics_path.exists())}")
+    print(f"lyrics_content_present={_has_text(lyrics_path)}")
+    print(f"layout_profile={layout_policy.profile if layout_policy else 'translator_default'}")
+    if layout_policy:
+        print(f"layout_limits=ch:{layout_policy.ch_max_units} jp:{layout_policy.jp_max_units}")
 
     translator = SubtitleTranslator(
         api_key=api_key,
@@ -75,6 +85,9 @@ def main() -> int:
         reference_txt_path=str(lyrics_path) if lyrics_path else None,
         output_mode=args.mode,
         proxy_url=proxy_url,
+        layout_profile=layout_policy.profile if layout_policy else "wide_16_9",
+        ch_max_units=layout_policy.ch_max_units if layout_policy else 64,
+        jp_max_units=layout_policy.jp_max_units if layout_policy else 84,
     )
     output = translator.run()
     if not output:
@@ -111,6 +124,10 @@ def main() -> int:
 
 def _count_cues(path: Path) -> int:
     return len([line for line in path.read_text(encoding="utf-8-sig", errors="ignore").splitlines() if line.strip().isdigit()])
+
+
+def _has_text(path: Path | None) -> bool:
+    return bool(path and path.is_file() and path.read_text(encoding="utf-8-sig", errors="ignore").strip())
 
 
 def _timeline_lines(path: Path) -> list[str]:
