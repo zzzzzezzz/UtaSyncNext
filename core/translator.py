@@ -14,7 +14,7 @@ from typing import Callable
 
 
 ProgressCallback = Callable[[float, str], None]
-PROMPT_POLICY_VERSION = "next-v6-timeline-speaker-lyric-guardrails"
+PROMPT_POLICY_VERSION = "next-v7-timeline-speaker-lyric-name-guardrails"
 SPEAKER_COLON_RE = re.compile(
     r"^(?P<label>[A-Za-z][A-Za-z0-9_. -]{1,24}|[\u3400-\u9fff\u3040-\u30ffー]{2,8})\s*[:：]"
 )
@@ -67,6 +67,7 @@ class SubtitleTranslator:
         layout_profile: str = "wide_16_9",
         ch_max_units: int = 64,
         jp_max_units: int = 84,
+        context_title: str = "",
     ) -> None:
         from openai import OpenAI
 
@@ -80,6 +81,7 @@ class SubtitleTranslator:
         self.layout_profile = str(layout_profile or "wide_16_9")
         self.ch_max_units = max(20, int(ch_max_units or 64))
         self.jp_max_units = max(28, int(jp_max_units or 84))
+        self.context_title = str(context_title or "").strip()
         self.max_workers = 2
         self.cancel_event = None
 
@@ -273,6 +275,7 @@ class SubtitleTranslator:
             self.ch_max_units,
             self.jp_max_units,
             reference_lyrics,
+            self.context_title,
         )
         cached = self.translation_cache.get(cache_key)
         original_batch_srt = _blocks_to_srt(batch)
@@ -442,6 +445,7 @@ class SubtitleTranslator:
             "8. 输入开头疑似说话人名称只用于理解，不要作为字幕冠名前缀输出。",
             "9. 不要删除句意中的姓名：自我介绍、称呼别人、歌词正文里自然出现的人名必须保留。",
             "10. 英文歌词、歌名和反复句属于字幕正文，即使反复出现在句首也必须完整保留。",
+            self._proper_noun_prompt_rules(),
             self._layout_prompt_rules(),
             output_rules.strip(),
         ]
@@ -451,6 +455,19 @@ class SubtitleTranslator:
             parts.append(f"【上一小段上下文，仅供理解，不要输出】\n{prev_context}")
         parts.append(f"【当前批次 SRT】\n{srt_batch_text}")
         return "\n\n".join(parts)
+
+    def _proper_noun_prompt_rules(self) -> str:
+        rules = (
+            "【专名保护】不得把不完整、同音或含糊的称呼擅自扩写成另一个姓名；"
+            "不确定时保留原文或罗马字，不要猜姓氏。"
+        )
+        if _proper_noun_profile(self.context_title) == "yama":
+            rules += (
+                " 当前内容与艺人 yama 有关：日文中的「山さん」必须校正并保留为「yamaさん」，"
+                "「山です」按语境校正为「yamaです」；中文译文统一写「yama」，"
+                "不得翻译成“山”，也不得扩写成“山田”等其他姓名。"
+            )
+        return rules
 
     def _layout_prompt_rules(self) -> str:
         ch_chars = max(10, self.ch_max_units // 2)
@@ -566,6 +583,7 @@ class SubtitleTranslator:
                 "layout_profile": self.layout_profile,
                 "ch_max_units": self.ch_max_units,
                 "jp_max_units": self.jp_max_units,
+                "proper_noun_profile": _proper_noun_profile(self.context_title),
                 "calls": [],
             }
             self.api_trace_announced = False
@@ -759,6 +777,7 @@ def _batch_cache_key(
     ch_max_units: int,
     jp_max_units: int,
     reference_lyrics: str,
+    context_title: str,
 ) -> str:
     payload = {
         "prompt_policy": PROMPT_POLICY_VERSION,
@@ -767,6 +786,7 @@ def _batch_cache_key(
         "layout_profile": layout_profile,
         "ch_max_units": ch_max_units,
         "jp_max_units": jp_max_units,
+        "proper_noun_profile": _proper_noun_profile(context_title),
         "reference_lyrics_md5": hashlib.md5(reference_lyrics.encode("utf-8")).hexdigest()
         if reference_lyrics
         else "",
@@ -774,6 +794,10 @@ def _batch_cache_key(
     }
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
+
+def _proper_noun_profile(context_title: str) -> str:
+    return "yama" if re.search(r"(?i)(?<![A-Za-z])yama(?![A-Za-z])", str(context_title or "")) else ""
 
 
 def _clean_model_output(text: str) -> str:

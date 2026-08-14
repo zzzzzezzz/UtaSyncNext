@@ -70,6 +70,7 @@ def main() -> int:
     translator.layout_profile = "wide_16_9"
     translator.ch_max_units = 64
     translator.jp_max_units = 84
+    translator.context_title = "ordinary interview"
     prompt = translator._build_prompt("1\n00:00:01,000 --> 00:00:02,000\n神谷です", "", "")
     if (
         "不要删除句意中的姓名" not in prompt
@@ -77,6 +78,20 @@ def main() -> int:
         or "英文歌词、歌名和反复句" not in prompt
     ):
         print("[FAIL] Prompt does not contain the scoped speaker-label policy.")
+        return 1
+
+    if "不要猜姓氏" not in prompt or "yamaさん" in prompt:
+        print("[FAIL] Generic proper-name policy is missing or leaked the yama-specific rule.")
+        return 1
+
+    translator.context_title = "#170yamaびこリフレイン"
+    yama_prompt = translator._build_prompt(
+        "1\n00:00:01,000 --> 00:00:02,000\n山さんの口癖ってなんですか",
+        "",
+        "",
+    )
+    if "山さん」必须校正并保留为「yamaさん" not in yama_prompt or "山田" not in yama_prompt:
+        print("[FAIL] yama-specific proper-name policy is missing.")
         return 1
 
     summary = format_run_summary(

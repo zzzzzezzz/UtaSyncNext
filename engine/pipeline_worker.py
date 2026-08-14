@@ -298,6 +298,7 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
                 layout_profile=layout_policy.profile,
                 ch_max_units=layout_policy.ch_max_units,
                 jp_max_units=layout_policy.jp_max_units,
+                context_title=base_name,
             )
             final_srt = translator.run(
                 cancel_event=cancel_event,
@@ -676,7 +677,7 @@ def _build_translation_cache_hash(
         }
     return _hash_payload(
         {
-            "version": 6,
+            "version": 7,
             "media": media_fingerprint,
             "source_srt": _file_content_hash(source_srt),
             "lyrics": lyrics_text,

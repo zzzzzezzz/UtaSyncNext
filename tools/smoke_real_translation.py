@@ -88,6 +88,7 @@ def main() -> int:
         layout_profile=layout_policy.profile if layout_policy else "wide_16_9",
         ch_max_units=layout_policy.ch_max_units if layout_policy else 64,
         jp_max_units=layout_policy.jp_max_units if layout_policy else 84,
+        context_title=media_path.stem if media_path else source_srt.stem,
     )
     output = translator.run()
     if not output:
