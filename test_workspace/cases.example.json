@@ -24,6 +24,15 @@
           "duration": "00:05:00"
         }
       ],
+      "acceptance_checks": [
+        "时间轴条数完整且没有重叠",
+        "长句在目标画幅内可读",
+        "翻译达到可人工精修的程度"
+      ],
+      "human_review": {
+        "verdict": "未确认",
+        "notes": "自动指标通过不代表翻译质量通过"
+      },
       "references": [
         {
           "level": "v3_auto",

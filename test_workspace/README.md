@@ -1,28 +1,42 @@
-# UtaSyncNext Regression Workspace
+# UtaSyncNext 回归验收工作区
 
-This directory keeps regression-test definitions separate from application code and output.
+这里把长期测试定义与产品代码、日常输出分开保存。目标不是让脚本替人判断字幕好坏，而是让每次结论都能回到同一份素材、设置和人工标准。
 
-## Boundaries
+## 边界
 
-- Source media, v3 output, and approved subtitles are read-only references.
-- Large media files are referenced by path and are never copied here.
-- `cases.local.json`, reports, and run artifacts stay local and are ignored by Git.
-- A v3 automatic output is historical evidence, not a human-approved answer.
+- 原始媒体、v3 输出和人工确认字幕只读使用。
+- 大体积媒体只记录路径，不复制进仓库。
+- `cases.local.json`、报告和运行产物只保留在本机，并由 Git 忽略。
+- v3 自动输出属于历史证据，不等于人工确认答案。
+- 每轮修改先跑短锚点；长 Live 只在阶段性版本做耐久测试。
 
-## Reference Levels
+## 三层测试集
 
-- `v3_auto`: untouched automatic output from v3.
-- `next_auto`: untouched automatic output from Next.
-- `human_approved`: a subtitle reviewed and accepted by the user.
+- `guardrail`：已经定位过的具体问题，例如窄画幅密度、假人名和时间轴完整性。
+- `anchor`：3 到 10 分钟的代表短片，用于日常比较柔和演唱、高速摇滚、歌词参考和访谈。
+- `milestone`：一到两小时的 Live 或电台，只用于阶段性验证内存、断点续跑和长任务稳定性。
 
-Only `human_approved` can be treated as a quality baseline. Automatic references are useful for detecting structural and behavioral changes.
+## 参考级别
 
-## Generate A Report
+- `v3_auto`：未经修改的 v3 自动输出。
+- `next_auto`：未经修改的 Next 自动输出。
+- `human_approved`：用户已经审看并认可的字幕。
+
+只有 `human_approved` 能作为质量基准。自动稿只适合检查结构变化、时间轴完整性、异常前缀和性能，不自动判定翻译优劣。
+
+## 日常流程
+
+1. 先生成报告，确认素材、参考文件和设置没有漂移。
+2. 优先运行 `guardrail` 和 `anchor`，对照清单里的人工验收重点。
+3. 记录人工结论；若预期与真实使用不一致，以人工实际审片为准并更新用例。
+4. 短集稳定后再运行 `milestone`，测试长任务和断点续跑。
+
+## 生成报告
 
 ```powershell
 .\.venv\Scripts\python.exe tools\regression_workspace.py report
 ```
 
-The local report records media identity, selected settings, reference files, timeline integrity, long lines, and suspected speaker-label prefixes. It does not claim that translation quality is correct.
+本地报告记录媒体身份、时长、画幅、编码、设置、参考文件、时间轴完整性和疑似说话人前缀。每个用例还应填写 `acceptance_checks` 和 `human_review`，但报告不会宣称翻译质量正确。
 
-`cases.example.json` documents the manifest format. The working machine uses the ignored `cases.local.json` file.
+`cases.example.json` 展示清单格式。本机实际使用由 Git 忽略的 `cases.local.json`。

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.regression_workspace import calculate_metrics, compare_timelines, generate_report, parse_srt
+from tools.regression_workspace import calculate_metrics, compare_timelines, generate_report, inspect_case, parse_srt
 
 
 SOURCE = """1
@@ -65,6 +65,8 @@ def main() -> int:
                         {
                             "id": "sample",
                             "media_path": str(media),
+                            "acceptance_checks": ["时间轴不丢失", "英文歌名不误报为说话人"],
+                            "human_review": {"verdict": "未确认"},
                             "references": [
                                 {
                                     "level": "v3_auto",
@@ -88,9 +90,16 @@ def main() -> int:
         if metrics.suspected_speaker_labels != {"深井:": 1}:
             print(f"[FAIL] Speaker metrics mismatch: {metrics.suspected_speaker_labels}")
             return 1
+        if metrics.max_lines_per_cue != 1:
+            print(f"[FAIL] Subtitle line metrics mismatch: {metrics.max_lines_per_cue}")
+            return 1
         lyric_metrics = calculate_metrics(parse_srt(LYRIC_REFRAINS))
         if lyric_metrics.suspected_speaker_labels:
             print(f"[FAIL] Lyric refrains were reported as speaker labels: {lyric_metrics.suspected_speaker_labels}")
+            return 1
+        case_report, missing = inspect_case(json.loads(manifest.read_text(encoding="utf-8"))["cases"][0])
+        if missing or case_report["acceptance_checks"] != ["时间轴不丢失", "英文歌名不误报为说话人"]:
+            print(f"[FAIL] Acceptance metadata mismatch: {case_report}")
             return 1
         if generate_report(manifest, report_dir, strict=True) != 0:
             print("[FAIL] Report generation failed.")

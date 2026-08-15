@@ -11,8 +11,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
 NEXT_ROOT = Path(__file__).resolve().parents[1]
+if str(NEXT_ROOT) not in sys.path:
+    sys.path.insert(0, str(NEXT_ROOT))
+
+from utils.ffmpeg_tools import safe_run
+
+
 DEFAULT_MANIFEST = NEXT_ROOT / "test_workspace" / "cases.local.json"
 DEFAULT_REPORT_DIR = NEXT_ROOT / "test_workspace" / "reports"
 TIME_RE = re.compile(
@@ -56,6 +61,7 @@ class SubtitleMetrics:
     non_monotonic: int
     max_duration_seconds: float
     max_text_units: int
+    max_lines_per_cue: int
     suspected_speaker_labels: dict[str, int]
 
 
@@ -158,6 +164,8 @@ def inspect_case(case: dict[str, Any]) -> tuple[dict[str, Any], int]:
             "tags": case.get("tags", []),
             "settings": case.get("settings", {}),
             "clips": case.get("clips", []),
+            "acceptance_checks": case.get("acceptance_checks", []),
+            "human_review": case.get("human_review", {}),
             "notes": case.get("notes", ""),
             "media": media_info,
             "lyrics": lyrics_info,
@@ -182,7 +190,43 @@ def inspect_file(path: Path | None, *, media: bool = False) -> dict[str, Any]:
     }
     result["fingerprint_kind"] = "sampled_sha256" if media else "sha256"
     result["fingerprint"] = _sampled_hash(resolved) if media else _full_hash(resolved)
+    if media:
+        result["probe"] = _probe_media(resolved)
     return result
+
+
+def _probe_media(path: Path) -> dict[str, Any]:
+    try:
+        result = safe_run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration:stream=codec_type,codec_name,width,height",
+                "-of",
+                "json",
+                str(path),
+            ],
+            timeout=20,
+        )
+        if result.returncode != 0:
+            return {"status": "failed"}
+        data = json.loads(result.stdout or "{}")
+        streams = data.get("streams", []) if isinstance(data, dict) else []
+        video = next((item for item in streams if item.get("codec_type") == "video"), {})
+        audio = next((item for item in streams if item.get("codec_type") == "audio"), {})
+        duration = float((data.get("format") or {}).get("duration") or 0.0)
+        return {
+            "status": "ok",
+            "duration_seconds": round(duration, 3),
+            "width": int(video.get("width") or 0),
+            "height": int(video.get("height") or 0),
+            "video_codec": str(video.get("codec_name") or ""),
+            "audio_codec": str(audio.get("codec_name") or ""),
+        }
+    except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError):
+        return {"status": "unavailable"}
 
 
 def inspect_subtitle(path: Path) -> dict[str, Any]:
@@ -225,6 +269,7 @@ def calculate_metrics(blocks: list[SubtitleBlock]) -> SubtitleMetrics:
     previous_end = -1
     max_duration = 0
     max_units = 0
+    max_lines = 0
     label_candidates: list[str] = []
     for block in blocks:
         if previous_end >= 0 and block.start_ms < previous_end:
@@ -235,6 +280,7 @@ def calculate_metrics(blocks: list[SubtitleBlock]) -> SubtitleMetrics:
         previous_end = block.end_ms
         max_duration = max(max_duration, block.end_ms - block.start_ms)
         max_units = max(max_units, *(_display_units(line) for line in block.text_lines))
+        max_lines = max(max_lines, len(block.text_lines))
         label_candidates.extend(_speaker_candidates(block.text_lines))
 
     counts = Counter(label_candidates)
@@ -247,6 +293,7 @@ def calculate_metrics(blocks: list[SubtitleBlock]) -> SubtitleMetrics:
         non_monotonic=non_monotonic,
         max_duration_seconds=round(max_duration / 1000, 3),
         max_text_units=max_units,
+        max_lines_per_cue=max_lines,
         suspected_speaker_labels=suspicious,
     )
 
@@ -300,6 +347,12 @@ def _validate_manifest(data: dict[str, Any]) -> None:
         ids.add(case_id)
         if not str(case.get("media_path", "")).strip():
             raise ValueError(f"Case {case_id} needs media_path.")
+        checks = case.get("acceptance_checks", [])
+        if checks and (
+            not isinstance(checks, list)
+            or any(not isinstance(item, str) or not item.strip() for item in checks)
+        ):
+            raise ValueError(f"Case {case_id} acceptance_checks must be a list of non-empty strings.")
 
 
 def _resolve_output_dir(path: Path) -> Path:
@@ -356,9 +409,9 @@ def _render_markdown(report: dict[str, Any]) -> str:
     lines = [
         f"# {report['workspace_name']}",
         "",
-        f"Generated: `{report['generated_at']}`",
+        f"生成时间：`{report['generated_at']}`",
         "",
-        "> This is an evidence report. Automatic output is not a human quality verdict.",
+        "> 这是客观证据报告，不会自动判定翻译和打轴质量。只有人工确认稿才能作为质量基准。",
         "",
     ]
     for case in report["cases"]:
@@ -368,38 +421,77 @@ def _render_markdown(report: dict[str, Any]) -> str:
                 f"## {case['title']}",
                 "",
                 f"- Case: `{case['id']}`",
-                f"- Tier/status: `{case['tier']}` / `{case['status']}`",
-                f"- Tags: {', '.join(case['tags']) or '-'}",
-                f"- Media: `{media['path']}` ({'found' if media['exists'] else 'missing'})",
-                f"- Settings: `{json.dumps(case['settings'], ensure_ascii=False, sort_keys=True)}`",
+                f"- 层级/状态：`{case['tier']}` / `{case['status']}`",
+                f"- 标签：{', '.join(case['tags']) or '-'}",
+                f"- 素材：`{media['path']}`（{'已找到' if media['exists'] else '缺失'}）",
+                f"- 设置：`{json.dumps(case['settings'], ensure_ascii=False, sort_keys=True)}`",
             ]
         )
+        probe = media.get("probe") or {}
+        if probe.get("status") == "ok":
+            duration = _format_duration_seconds(float(probe.get("duration_seconds") or 0))
+            width = int(probe.get("width") or 0)
+            height = int(probe.get("height") or 0)
+            frame = f"{width}x{height}" if width and height else "纯音频"
+            codecs = "/".join(value for value in (probe.get("video_codec"), probe.get("audio_codec")) if value)
+            lines.append(f"- 媒体信息：`{duration}`，`{frame}`，`{codecs or '未知编码'}`")
         if case["clips"]:
             for clip in case["clips"]:
                 lines.append(
-                    f"- Clip: {clip.get('label', 'segment')} `{clip.get('start', '')}` + `{clip.get('duration', '')}`"
+                    f"- 测试片段：{clip.get('label', '片段')} `{clip.get('start', '')}` + `{clip.get('duration', '')}`"
                 )
         else:
-            lines.append("- Clip: not selected yet")
+            lines.append("- 测试片段：尚未选择")
+        if case["acceptance_checks"]:
+            lines.append("- 人工验收重点：" + "；".join(case["acceptance_checks"]))
+        review = case["human_review"]
+        if review:
+            lines.append(
+                f"- 人工结论：`{review.get('verdict', '未确认')}`"
+                + (f"，{review.get('notes', '')}" if review.get("notes") else "")
+            )
         for reference in case["references"]:
-            lines.append(f"- Reference level: `{reference['level']}`")
+            lines.append(f"- 参考级别：`{reference['level']}`")
+            source_metrics = (reference.get("source") or {}).get("metrics")
+            translated_metrics = (reference.get("translated") or {}).get("metrics")
+            if source_metrics:
+                lines.append(f"- 原文指标：{_format_subtitle_metrics(source_metrics)}")
+            if translated_metrics:
+                lines.append(f"- 输出指标：{_format_subtitle_metrics(translated_metrics)}")
             comparison = reference.get("timeline_comparison")
             if comparison:
                 lines.append(
-                    "- Timeline: "
-                    f"{comparison['source_cues']} -> {comparison['translated_cues']} cues; "
-                    f"positional match {comparison['positional_match_ratio']:.1%}; "
-                    f"missing {comparison['missing_source_timelines']}, added {comparison['added_timelines']}"
+                    "- 时间轴："
+                    f"{comparison['source_cues']} -> {comparison['translated_cues']} 条；"
+                    f"同位置一致 {comparison['positional_match_ratio']:.1%}；"
+                    f"缺少 {comparison['missing_source_timelines']}，新增 {comparison['added_timelines']}"
                 )
             translated = reference.get("translated")
             if translated and translated.get("metrics"):
                 labels = translated["metrics"]["suspected_speaker_labels"]
                 if labels:
-                    lines.append(f"- Suspected speaker labels: `{json.dumps(labels, ensure_ascii=False)}`")
+                    lines.append(f"- 疑似说话人前缀：`{json.dumps(labels, ensure_ascii=False)}`")
         if case["notes"]:
-            lines.append(f"- Notes: {case['notes']}")
+            lines.append(f"- 说明：{case['notes']}")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _format_duration_seconds(value: float) -> str:
+    total = max(0, int(round(value)))
+    hours, remainder = divmod(total, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _format_subtitle_metrics(metrics: dict[str, Any]) -> str:
+    return (
+        f"{int(metrics.get('cue_count') or 0)} 条，"
+        f"最长 {float(metrics.get('max_duration_seconds') or 0):.2f} 秒，"
+        f"最长单行 {int(metrics.get('max_text_units') or 0)} 显示单位，"
+        f"每条最多 {int(metrics.get('max_lines_per_cue') or 0)} 行，"
+        f"重叠 {int(metrics.get('overlaps') or 0)}"
+    )
 
 
 if __name__ == "__main__":
