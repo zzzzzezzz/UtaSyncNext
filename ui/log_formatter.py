@@ -90,6 +90,7 @@ def format_run_summary(summary: dict[str, Any]) -> str:
         alignment_fallbacks = int(summary.get("translation_alignment_fallbacks") or 0)
         removed_labels = int(summary.get("translation_speaker_labels_removed") or 0)
         speaker_warnings = int(summary.get("translation_speaker_label_warnings") or 0)
+        lyric_warnings = int(summary.get("translation_lyric_alignment_warnings") or 0)
         if alignment_fallbacks:
             lines.append(
                 f"翻译保护：有 {alignment_fallbacks} 条内容未能可靠对应，已保留该处原文，后续字幕没有顺移。"
@@ -98,6 +99,8 @@ def format_run_summary(summary: dict[str, Any]) -> str:
             lines.append(f"对谈清理：已移除 {removed_labels} 处高置信角色标签。")
         if speaker_warnings:
             lines.append(f"复核提醒：仍检测到 {speaker_warnings} 类疑似说话人冠名，请检查对应字幕。")
+        if lyric_warnings:
+            lines.append(f"歌词复核：仍有 {lyric_warnings} 处相邻歌词疑似重复，请检查对应字幕。")
     else:
         lines.append("翻译：未配置接口，本次只生成原文字幕。")
 

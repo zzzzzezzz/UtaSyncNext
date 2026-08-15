@@ -198,6 +198,7 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
             "translation_alignment_fallbacks": 0,
             "translation_speaker_label_warnings": 0,
             "translation_speaker_labels_removed": 0,
+            "translation_lyric_alignment_warnings": 0,
             "translation_model": api_model if api_key else "",
             "translation_returned_models": [],
             "ass_generated": False,
@@ -324,6 +325,9 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
                     ),
                     "translation_speaker_label_warnings": int(
                         getattr(translator, "speaker_label_warnings", 0) or 0
+                    ),
+                    "translation_lyric_alignment_warnings": int(
+                        getattr(translator, "lyric_alignment_warnings", 0) or 0
                     ),
                 }
             )

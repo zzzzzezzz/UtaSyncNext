@@ -14,7 +14,7 @@ from typing import Callable
 
 
 ProgressCallback = Callable[[float, str], None]
-PROMPT_POLICY_VERSION = "next-v8-user-model-speaker-cleanup"
+PROMPT_POLICY_VERSION = "next-v10-lyric-overlap-retry"
 API_REQUEST_TIMEOUT_SECONDS = 180.0
 SPEAKER_COLON_RE = re.compile(
     r"^(?P<label>[A-Za-z][A-Za-z0-9_. -]{1,24}|[\u3400-\u9fff\u3040-\u30ffー]{2,8})\s*[:：]"
@@ -108,6 +108,7 @@ class SubtitleTranslator:
         self.alignment_fallbacks = 0
         self.speaker_label_warnings = 0
         self.speaker_labels_removed = 0
+        self.lyric_alignment_warnings = 0
         self.active_model = self.primary_model
         self.returned_models: set[str] = set()
         self.api_trace: dict[str, object] = {}
@@ -134,6 +135,7 @@ class SubtitleTranslator:
         self.alignment_fallbacks = 0
         self.speaker_label_warnings = 0
         self.speaker_labels_removed = 0
+        self.lyric_alignment_warnings = 0
         self.returned_models.clear()
         print("\n[Next 翻译阶段] 启动独立大模型翻译器...")
 
@@ -316,6 +318,7 @@ class SubtitleTranslator:
         prompt = self._build_prompt(prompt_batch_srt, prompt_context, reference_lyrics)
         max_retries = 4
         speaker_cleanup_retry = False
+        lyric_alignment_retry = False
 
         for attempt in range(max_retries):
             if self.cancel_event and self.cancel_event.is_set():
@@ -329,6 +332,12 @@ class SubtitleTranslator:
                         "\n\n【本批次修正】上次输出仍含疑似说话人冠名。"
                         "删除每句开头及句中用于区分角色的‘姓名：’或‘姓名 台词’标签，"
                         "但必须保留自我介绍、称呼别人、英文歌词、歌名、反复句以及句意中自然出现的真实姓名。"
+                    )
+                if lyric_alignment_retry:
+                    request_prompt += (
+                        "\n\n【本批次歌词对齐修正】上次输出把后一时间轴的歌词提前写进前一轴，造成相邻字幕重复。"
+                        "请按每个时间轴的粗听片段重新拆分日文和中文；前一轴只保留前半句，"
+                        "后一轴保留后半句，不得删除时间轴或把后续歌词前移。"
                     )
                 response = self.client.chat.completions.create(
                     model=target_model,
@@ -374,6 +383,24 @@ class SubtitleTranslator:
                     print(
                         f"      [提醒] 批次 {batch_idx + 1}/{total_batches} 仍有疑似说话人冠名，请复核: "
                         + ", ".join(labels)
+                    )
+
+                lyric_issues = []
+                if reference_lyrics and self.output_mode == "bilingual":
+                    lyric_issues = _suspected_lyric_sequence_issues(result_text, batch)
+                if lyric_issues and not lyric_alignment_retry:
+                    lyric_alignment_retry = True
+                    print(
+                        f"      批次 {batch_idx + 1}/{total_batches} 检测到相邻歌词重复，正在局部重试: "
+                        + ", ".join(lyric_issues)
+                    )
+                    continue
+                if lyric_issues:
+                    with self.failure_lock:
+                        self.lyric_alignment_warnings += len(lyric_issues)
+                    print(
+                        f"      [提醒] 批次 {batch_idx + 1}/{total_batches} 仍有相邻歌词重复，请复核: "
+                        + ", ".join(lyric_issues)
                     )
 
                 restored = self._restore_timestamps(result_text, batch)
@@ -487,6 +514,12 @@ class SubtitleTranslator:
             output_rules.strip(),
         ]
         if reference_lyrics:
+            parts.append(
+                "【歌词顺序对齐】同一行歌词如果被相邻时间轴拆开，必须按各时间轴实际听到的片段分配，"
+                "不要在前一轴写完整句、后一轴又重复句尾。除非粗听明确是重复演唱，"
+                "不要把参考歌词中的同一句连续分配给多个时间轴；无法可靠对应时保留当前粗听，"
+                "不要提前套用下一句歌词。"
+            )
             parts.append(f"【参考歌词】\n{reference_lyrics}")
         if prev_context:
             parts.append(f"【上一小段上下文，仅供理解，不要输出】\n{prev_context}")
@@ -705,6 +738,7 @@ class SubtitleTranslator:
             self.api_trace["api_calls"] = self.api_calls
             self.api_trace["failed_batches"] = self.failed_batches
             self.api_trace["speaker_labels_removed"] = self.speaker_labels_removed
+            self.api_trace["lyric_alignment_warnings"] = self.lyric_alignment_warnings
             self.api_trace["returned_models"] = sorted(self.returned_models)
             if error:
                 safe_error = error.replace(self.api_key, "[REDACTED]") if self.api_key else error
@@ -812,6 +846,36 @@ def _suspected_speaker_labels(content: str) -> list[str]:
         if bare and bare.group("label").strip().casefold() in KNOWN_SPEAKER_LABELS:
             labels.add(bare.group("label").strip())
     return sorted(labels, key=str.casefold)
+
+
+def _suspected_lyric_sequence_issues(content: str, source_blocks: list[SrtBlock]) -> list[str]:
+    translated = _parse_srt_text(content)
+    by_time = {_normalize_time_line(block.time_line): block for block in translated}
+    issues: list[str] = []
+    for left_source, right_source in zip(source_blocks, source_blocks[1:]):
+        left = by_time.get(_normalize_time_line(left_source.time_line))
+        right = by_time.get(_normalize_time_line(right_source.time_line))
+        if left is None or right is None or not left.text_lines or not right.text_lines:
+            continue
+
+        left_text = _normalize_lyric_text(left.text_lines[0])
+        right_text = _normalize_lyric_text(right.text_lines[0])
+        source_left = _normalize_lyric_text(left_source.text_lines[0])
+        source_right = _normalize_lyric_text(right_source.text_lines[0])
+        if not _is_repeated_lyric_tail(left_text, right_text):
+            continue
+        if _is_repeated_lyric_tail(source_left, source_right):
+            continue
+        issues.append(f"{left_source.index}->{right_source.index}")
+    return issues
+
+
+def _normalize_lyric_text(text: str) -> str:
+    return re.sub(r"[\s、。！？,.!?;；:：'\"“”‘’（）()\[\]【】]", "", str(text or "")).casefold()
+
+
+def _is_repeated_lyric_tail(left: str, right: str) -> bool:
+    return len(right) >= 4 and (left == right or (len(left) > len(right) and left.endswith(right)))
 
 
 def _strip_known_speaker_labels(content: str) -> tuple[str, int]:

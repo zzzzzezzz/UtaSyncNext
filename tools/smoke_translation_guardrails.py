@@ -13,6 +13,7 @@ from core.translator import (
     SrtBlock,
     SubtitleTranslator,
     _strip_known_speaker_labels,
+    _suspected_lyric_sequence_issues,
     _suspected_speaker_labels,
 )
 from ui.log_formatter import format_run_summary
@@ -101,6 +102,46 @@ def main() -> int:
     if "不要猜姓氏" not in prompt or "yamaさん" in prompt:
         print("[FAIL] Generic proper-name policy is missing or leaked the yama-specific rule.")
         return 1
+    lyric_prompt = translator._build_prompt(
+        "1\n00:00:01,000 --> 00:00:02,000\n握り\n\n2\n00:00:02,000 --> 00:00:03,000\nなおした",
+        "",
+        "少し湿った手を握りなおした",
+    )
+    if "前一轴写完整句、后一轴又重复句尾" not in lyric_prompt or "不要提前套用下一句歌词" not in lyric_prompt:
+        print("[FAIL] Prompt does not contain the lyric sequence alignment policy.")
+        return 1
+    if "歌词顺序对齐" in prompt:
+        print("[FAIL] Lyric sequence rules leaked into blind translation mode.")
+        return 1
+
+    lyric_source = [
+        SrtBlock(1, "00:00:01,000 --> 00:00:02,000", ("君が笑うその香り",)),
+        SrtBlock(2, "00:00:02,000 --> 00:00:03,000", ("触れたいから",)),
+    ]
+    lyric_overlap = """1
+00:00:01,000 --> 00:00:02,000
+君が笑う その顔に触れたいから
+因为想触碰你微笑的脸
+
+2
+00:00:02,000 --> 00:00:03,000
+触れたいから
+想要触碰
+"""
+    if _suspected_lyric_sequence_issues(lyric_overlap, lyric_source) != ["1->2"]:
+        print("[FAIL] Adjacent lyric tail duplication was not detected.")
+        return 1
+
+    actual_refrain = [
+        SrtBlock(1, "00:00:01,000 --> 00:00:02,000", ("エンドロールいらないよ",)),
+        SrtBlock(2, "00:00:02,000 --> 00:00:03,000", ("エンドロールいらないよ",)),
+    ]
+    refrain_output = lyric_overlap.replace("君が笑う その顔に触れたいから", "エンドロールいらないよ").replace(
+        "触れたいから", "エンドロールいらないよ"
+    )
+    if _suspected_lyric_sequence_issues(refrain_output, actual_refrain):
+        print("[FAIL] A refrain already present in the source was treated as model duplication.")
+        return 1
 
     translator.context_title = "#170yamaびこリフレイン"
     yama_prompt = translator._build_prompt(
@@ -118,6 +159,7 @@ def main() -> int:
             "translation_alignment_fallbacks": 1,
             "translation_speaker_label_warnings": 2,
             "translation_speaker_labels_removed": 3,
+            "translation_lyric_alignment_warnings": 1,
             "translation_model": "deepseek-ai/DeepSeek-V3",
         }
     )
@@ -125,6 +167,7 @@ def main() -> int:
         "已保留该处原文" not in summary
         or "疑似说话人冠名" not in summary
         or "已移除 3 处高置信角色标签" not in summary
+        or "相邻歌词疑似重复" not in summary
         or "DeepSeek-V3" not in summary
     ):
         print("[FAIL] User-facing summary does not explain translation guardrail results.")
