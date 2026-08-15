@@ -24,7 +24,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run a minimal UtaSyncNext pipeline smoke test.")
     parser.add_argument("--model", default="small", help="Local Faster-Whisper model to use.")
     parser.add_argument("--media", default="", help="Optional media path. If omitted, a short wav is generated.")
-    parser.add_argument("--mode", default="live", choices=["live", "speech"], help="Acoustic mode for the smoke run.")
+    parser.add_argument(
+        "--mode",
+        default="live",
+        choices=["live", "live_soft", "speech"],
+        help="Acoustic mode for the smoke run.",
+    )
     parser.add_argument("--demucs", action="store_true", help="Enable Demucs vocal separation. Default skips Demucs.")
     parser.add_argument("--ass", action="store_true", help="Generate ASS after SRT. Default writes SRT only.")
     parser.add_argument("--use-settings-api", action="store_true", help="Use local user_settings.json API fields for real translation.")
@@ -55,7 +60,11 @@ def main() -> int:
             return 1
         lyrics_text = lyrics_path.read_text(encoding="utf-8-sig", errors="ignore").strip()
 
-    audio_type = "访谈 / 播客" if args.mode == "speech" else "Live 现场演唱 (常规/摇滚)"
+    audio_type = {
+        "speech": "访谈 / 播客",
+        "live_soft": "Live 现场演唱 (极柔气声/清唱)",
+        "live": "Live 现场演唱 (常规/摇滚)",
+    }[args.mode]
     demucs_setting = "开启 Demucs 人声分离 (高质量/很慢)" if args.demucs else "先跳过 Demucs (极速/推荐先出轴)"
     ass_preset = "默认双语 (纯白+浅灰)" if args.ass else "不生成 (仅SRT)"
     api_settings = {"api_key": "", "api_url": "", "api_model": "", "proxy_url": ""}
@@ -92,7 +101,7 @@ def main() -> int:
     }
 
     messages = _run_worker(payload, timeout=args.timeout)
-    _print_message_summary(messages)
+    _safe_print(f"message_count={len(messages)}")
 
     errors = [message for message in messages if message.get("type") == MSG_ERROR]
     if errors:
@@ -180,39 +189,43 @@ def _run_worker(payload: dict[str, object], timeout: int) -> list[dict[str, obje
         if time.monotonic() - started > timeout:
             cancel_event.set()
             process.terminate()
-            messages.append({"type": MSG_ERROR, "text": f"worker timeout after {timeout}s"})
+            message = {"type": MSG_ERROR, "text": f"worker timeout after {timeout}s"}
+            messages.append(message)
+            _print_message(message)
             break
         try:
-            messages.append(msg_queue.get(timeout=0.2))
+            message = msg_queue.get(timeout=0.2)
+            messages.append(message)
+            _print_message(message)
         except queue.Empty:
             pass
 
     process.join(timeout=3)
     while True:
         try:
-            messages.append(msg_queue.get_nowait())
+            message = msg_queue.get_nowait()
+            messages.append(message)
+            _print_message(message)
         except queue.Empty:
             break
     return messages
 
 
-def _print_message_summary(messages: list[dict[str, object]]) -> None:
-    _safe_print(f"message_count={len(messages)}")
-    for message in messages:
-        msg_type = message.get("type")
-        if msg_type in {MSG_STATUS, MSG_PROGRESS, MSG_DONE, MSG_ERROR}:
-            _safe_print(f"{msg_type}: {message.get('text')}")
-        elif msg_type == MSG_LOG:
-            text = str(message.get("text", "")).strip()
-            if text:
-                _safe_print(f"log: {text[-300:]}")
+def _print_message(message: dict[str, object]) -> None:
+    msg_type = message.get("type")
+    if msg_type in {MSG_STATUS, MSG_PROGRESS, MSG_DONE, MSG_ERROR}:
+        _safe_print(f"{msg_type}: {message.get('text')}")
+    elif msg_type == MSG_LOG:
+        text = str(message.get("text", "")).strip()
+        if text:
+            _safe_print(f"log: {text[-300:]}")
 
 
 def _safe_print(text: str) -> None:
     try:
-        print(text)
+        print(text, flush=True)
     except UnicodeEncodeError:
-        print(text.encode("utf-8", errors="replace").decode("utf-8", errors="replace"))
+        print(text.encode("utf-8", errors="replace").decode("utf-8", errors="replace"), flush=True)
 
 
 def _is_valid_srt(path: Path) -> bool:

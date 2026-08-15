@@ -336,10 +336,10 @@ class LiveSubtitleGenerator:
             raise RuntimeError(f"用户中断：{message}")
 
     def _format_timestamp(self, seconds: float) -> str:
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
-        milliseconds = int((seconds - int(seconds)) * 1000)
+        total_ms = max(0, int(round(seconds * 1000)))
+        hours, remainder = divmod(total_ms, 3_600_000)
+        minutes, remainder = divmod(remainder, 60_000)
+        secs, milliseconds = divmod(remainder, 1000)
         return f"{hours:02d}:{minutes:02d}:{secs:02d},{milliseconds:03d}"
 
     # CTranslate2 can fail either while loading the model or later while

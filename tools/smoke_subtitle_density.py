@@ -57,6 +57,10 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="utasyncnext-density-") as temp_dir:
         generator = LiveSubtitleGenerator("density_fixture.mp4", output_dir=temp_dir)
+        _require(
+            generator._format_timestamp(55.399999999) == "00:00:55,400",
+            "SRT timestamp formatting must round float noise to the nearest millisecond",
+        )
         generator.model = _FakeWhisperModel(source)
         output_path = Path(temp_dir) / "density.srt"
         generator._write_transcription_srt(

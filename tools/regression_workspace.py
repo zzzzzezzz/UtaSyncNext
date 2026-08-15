@@ -272,7 +272,9 @@ def calculate_metrics(blocks: list[SubtitleBlock]) -> SubtitleMetrics:
     max_lines = 0
     label_candidates: list[str] = []
     for block in blocks:
-        if previous_end >= 0 and block.start_ms < previous_end:
+        # One millisecond can be introduced by float-to-SRT rounding and has no
+        # visible playback impact. Report only meaningful overlaps.
+        if previous_end >= 0 and block.start_ms + 1 < previous_end:
             overlaps += 1
         if previous_start >= 0 and block.start_ms < previous_start:
             non_monotonic += 1
