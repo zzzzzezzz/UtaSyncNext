@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import time
+import wave
 from pathlib import Path
 from typing import Callable
 
@@ -157,18 +158,33 @@ class LiveSubtitleGenerator:
                 status_msg += " (火力全开)"
             print(f"      [分离进度] {status_msg} ➔ {pct}%")
 
-            cmd = self._demucs_command(segment_args, chunks_dir, chunk_file)
-            try:
-                self._run_cmd(cmd, task_name=f"人声分离 (第 {index} 分段)")
-            except Exception as exc:
-                raise RuntimeError(f"Demucs 在处理第 {index} 个切片时失败:\n{exc}") from exc
-
             chunk_name = Path(chunk_file).stem
             chunk_vocal = os.path.join(chunks_dir, "htdemucs_ft", chunk_name, "vocals.wav")
-            if os.path.exists(chunk_vocal):
+            if self._is_valid_wav_cache(chunk_vocal):
+                print(f"      -> ⏩ 分段 {index} 已完成，直接续跑下一段。")
                 vocal_chunks.append(chunk_vocal)
-            else:
-                print(f"      -> ⚠️ 找不到分段 {index} 的人声文件，可能该片段过短或 Demucs 输出异常。")
+                continue
+
+            cmd = self._demucs_command(segment_args, chunks_dir, chunk_file)
+            for attempt in range(1, 3):
+                log_name = f"demucs_{chunk_name}_attempt_{attempt}.log"
+                try:
+                    self._run_cmd(
+                        cmd,
+                        task_name=f"人声分离 (第 {index} 分段)",
+                        log_name=log_name,
+                    )
+                    if not self._is_valid_wav_cache(chunk_vocal):
+                        raise RuntimeError(f"分段输出缺失或 WAV 文件不完整: {chunk_vocal}")
+                    vocal_chunks.append(chunk_vocal)
+                    break
+                except Exception as exc:
+                    shutil.rmtree(str(Path(chunk_vocal).parent), ignore_errors=True)
+                    if attempt == 1:
+                        print(f"      -> ⚠️ 分段 {index} 处理失败，将自动重试一次。")
+                        time.sleep(2)
+                        continue
+                    raise RuntimeError(f"Demucs 在处理第 {index} 个切片时失败:\n{exc}") from exc
 
         if not vocal_chunks:
             raise RuntimeError("所有分段处理完毕，但未提取到任何人声文件。")
@@ -188,9 +204,16 @@ class LiveSubtitleGenerator:
         except Exception as exc:
             print(f"   -> ⚠️ 缓存清理时出现小问题 (可忽略): {exc}")
 
-    def _run_cmd(self, cmd: list[str], task_name: str | None = None) -> int:
-        log_path = os.path.join(self.audio_dir, "last_cmd.log")
+    def _run_cmd(
+        self,
+        cmd: list[str],
+        task_name: str | None = None,
+        log_name: str | None = None,
+    ) -> int:
+        log_path = os.path.join(self.audio_dir, log_name or "last_cmd.log")
         with open(log_path, "w", encoding="utf-8", errors="ignore") as out_file:
+            out_file.write(f"[command] {subprocess.list2cmdline(cmd)}\n")
+            out_file.flush()
             kwargs: dict[str, object] = {
                 "stdout": out_file,
                 "stderr": subprocess.STDOUT,
@@ -222,8 +245,26 @@ class LiveSubtitleGenerator:
                 content = Path(log_path).read_text(encoding="utf-8", errors="ignore").strip()
                 if content:
                     err_msg = content[-1500:]
-            raise RuntimeError(f"进程异常退出 (退出码: {process.returncode})。\n[底层真实报错日志]:\n{err_msg}")
+            raise RuntimeError(
+                f"进程异常退出 (退出码: {process.returncode})。\n"
+                f"诊断日志: {log_path}\n"
+                f"[底层真实报错日志]:\n{err_msg}"
+            )
         return process.returncode
+
+    @staticmethod
+    def _is_valid_wav_cache(path: str | os.PathLike[str]) -> bool:
+        try:
+            if not os.path.exists(path) or os.path.getsize(path) <= 44:
+                return False
+            with wave.open(str(path), "rb") as handle:
+                return (
+                    handle.getnchannels() > 0
+                    and handle.getframerate() > 0
+                    and handle.getnframes() > 0
+                )
+        except (OSError, EOFError, wave.Error):
+            return False
 
     def _can_reuse_vocal_cache(self, strategy: str) -> bool:
         cache_path = self._cache_path_for_strategy(strategy)

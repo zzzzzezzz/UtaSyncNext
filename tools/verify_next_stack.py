@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import wave
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -81,6 +82,7 @@ def main() -> int:
     _add(results, "compile", _compile_next_sources)
     _add(results, "legacy-scan", _scan_legacy_wrappers)
     _add(results, "audio-cache-policy", _check_audio_cache_policy)
+    _add(results, "demucs-chunk-resume", _check_demucs_chunk_resume)
     _add(results, "demucs-setting-policy", _check_demucs_setting_policy)
     _add(results, "translation-model-policy", _check_translation_model_policy)
     _add(results, "pipeline-cache-fingerprint", _check_pipeline_cache_fingerprint)
@@ -323,6 +325,73 @@ def _check_audio_cache_policy() -> str:
             raise AssertionError("cleanup should keep both source and Demucs vocal caches")
 
     return "source and Demucs caches are independent and survive cleanup"
+
+
+def _check_demucs_chunk_resume() -> str:
+    from core.generator import LiveSubtitleGenerator
+    from utils.ffmpeg_tools import FFmpegAudioProcessor
+
+    def write_wav(path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with wave.open(str(path), "wb") as handle:
+            handle.setnchannels(1)
+            handle.setsampwidth(2)
+            handle.setframerate(16000)
+            handle.writeframes(b"\x00\x00" * 160)
+
+    with tempfile.TemporaryDirectory(prefix="utasyncnext-demucs-resume-") as temp_dir:
+        generator = LiveSubtitleGenerator("demucs_resume_fixture.mp4", output_dir=temp_dir)
+        chunks_dir = Path(generator.audio_dir) / "chunks"
+        chunk_a = chunks_dir / "chunk_000.wav"
+        chunk_b = chunks_dir / "chunk_001.wav"
+        write_wav(chunk_a)
+        write_wav(chunk_b)
+
+        cached_vocal = chunks_dir / "htdemucs_ft" / chunk_a.stem / "vocals.wav"
+        retried_vocal = chunks_dir / "htdemucs_ft" / chunk_b.stem / "vocals.wav"
+        write_wav(cached_vocal)
+
+        calls: list[str] = []
+
+        def fake_run(cmd: list[str], task_name: str | None = None, log_name: str | None = None) -> int:
+            calls.append(str(log_name or ""))
+            if len(calls) == 1:
+                raise RuntimeError("simulated transient Demucs crash")
+            write_wav(retried_vocal)
+            return 0
+
+        def fake_concat(vocal_chunks: list[str], output_path: str, work_dir: str) -> None:
+            if vocal_chunks != [str(cached_vocal), str(retried_vocal)]:
+                raise AssertionError(f"unexpected resumed chunks: {vocal_chunks}")
+            write_wav(Path(output_path))
+
+        original_segment = FFmpegAudioProcessor.segment_audio
+        original_concat = FFmpegAudioProcessor.concat_audio
+        original_run = generator._run_cmd
+        original_command = generator._demucs_command
+        try:
+            FFmpegAudioProcessor.segment_audio = staticmethod(
+                lambda audio_path, output_dir, chunk_length: [str(chunk_a), str(chunk_b)]
+            )
+            FFmpegAudioProcessor.concat_audio = staticmethod(fake_concat)
+            generator._run_cmd = fake_run  # type: ignore[method-assign]
+            generator._demucs_command = lambda segment_args, output_dir, chunk_file: [  # type: ignore[method-assign]
+                "demucs-test",
+                chunk_file,
+            ]
+            result = generator.isolate_vocals(skip=False, hardware_mode="low")
+        finally:
+            FFmpegAudioProcessor.segment_audio = original_segment
+            FFmpegAudioProcessor.concat_audio = original_concat
+            generator._run_cmd = original_run  # type: ignore[method-assign]
+            generator._demucs_command = original_command  # type: ignore[method-assign]
+
+        if result != generator.final_vocal_path or not generator._is_valid_wav_cache(result):
+            raise AssertionError("resumed Demucs chunks should produce a valid final vocal cache")
+        if calls != ["demucs_chunk_001_attempt_1.log", "demucs_chunk_001_attempt_2.log"]:
+            raise AssertionError(f"failed Demucs chunk should retry once with separate logs: {calls}")
+
+    return "completed chunks are reused and a failed chunk retries once with separate logs"
 
 
 def _check_demucs_setting_policy() -> str:
