@@ -14,6 +14,14 @@ from core.ass_maker import ASSMaker
 from engine.cache_env import app_root
 from utils.ffmpeg_tools import _escape_filter_path, inspect_ffmpeg, subprocess_kwargs
 
+# Size of the frame handed to the workbench preview card.
+PREVIEW_WIDTH = 640
+PREVIEW_HEIGHT = 360
+# ASS size units are relative to PlayResY, so the style must be rendered against
+# the export resolution and only then downscaled for display.
+RENDER_WIDTH = 1920
+RENDER_HEIGHT = 1080
+
 
 def render_ass_preview_frame(config: dict[str, Any], japanese: str, chinese: str) -> Image.Image:
     """Use the same ASSMaker and libass path as export, on a neutral 16:9 frame.
@@ -38,18 +46,23 @@ def render_ass_preview_frame(config: dict[str, Any], japanese: str, chinese: str
         # A static style frame should not disappear inside the fade-in interval;
         # animation timing is checked separately during the video burn flow.
         preview_config["fade_mode"] = "硬切"
-        # Match the compact workbench canvas so the ASS text stays legible when
-        # the 16:9 frame is fitted into the preview card.
-        preview_config["resolution_x"] = 640
-        preview_config["resolution_y"] = 360
+        # Keep the ASS PlayRes at the real export resolution. Font sizes in ASS
+        # are relative to PlayResY, so shrinking the canvas inflates every font
+        # and makes long lines look like they overflow while the exported video
+        # is fine. The finished frame is downscaled for the preview card instead.
+        preview_config["resolution_x"] = int(preview_config.get("resolution_x") or RENDER_WIDTH)
+        preview_config["resolution_y"] = int(preview_config.get("resolution_y") or RENDER_HEIGHT)
         ass_path = Path(ASSMaker(str(source)).generate_ass(preview_config))
         fonts_dir = app_root() / "fonts"
         fonts_filter = f":fontsdir={_escape_filter_path(fonts_dir)}" if fonts_dir.is_dir() else ""
         result = subprocess.run(
             [
                 str(ffmpeg), "-hide_banner", "-loglevel", "error", "-f", "lavfi",
-                "-i", "color=c=0x050505:s=640x360:r=1:d=3",
-                "-vf", f"subtitles={ass_path.name}{fonts_filter}",
+                "-i",
+                f"color=c=0x050505:s={preview_config['resolution_x']}x{preview_config['resolution_y']}:r=1:d=3",
+                "-vf",
+                f"subtitles={ass_path.name}{fonts_filter}"
+                f",scale={PREVIEW_WIDTH}:{PREVIEW_HEIGHT}:flags=lanczos",
                 "-ss", "1.0", "-frames:v", "1", "-f", "image2pipe", "-vcodec", "png", "-",
             ],
             cwd=temp_root,
