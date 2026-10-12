@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from core.font_names import resolve_render_family
 from core.subtitle_policy import wrap_ass_text
 
 
@@ -121,6 +122,136 @@ ASS_PRESETS: dict[str, dict[str, Any]] = {
         "outline_size": 1,
         "shadow_size": 0,
     },
+    "yama霓虹夜行": {
+        "ch_font": "Smiley Sans",
+        "ch_size": 55,
+        "ch_color": "#E1F5FE",
+        "ch_outline": "#01579B",
+        "jp_font": "FOT-Rodin Pro M",
+        "jp_size": 35,
+        "jp_color": "#B3E5FC",
+        "jp_outline": "#01579B",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "契合yama/iri/eill的都市R&B潮流动感，高明度冰蓝搭配深暗夜蓝描边，霓虹微光中的现代利落感",
+    },
+    "Aimer空灵诗篇": {
+        "ch_font": "LXGW WenKai",
+        "ch_size": 55,
+        "ch_color": "#F0F5F9",
+        "ch_outline": "#3A4A5D",
+        "jp_font": "Yu Mincho",
+        "jp_size": 35,
+        "jp_color": "#E8D5C5",
+        "jp_outline": "#3A4A5D",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "契合Aimer/樋口爱窒息式抒情，云雾灰白主色搭配燕麦奶副色，深靛蓝描边营造文艺电影胶片质感",
+    },
+    "春樱恋歌": {
+        "ch_font": "LXGW WenKai",
+        "ch_size": 55,
+        "ch_color": "#FFEEF3",
+        "ch_outline": "#8C4562",
+        "jp_font": "FOT-Rodin Pro M",
+        "jp_size": 35,
+        "jp_color": "#E6F7FF",
+        "jp_outline": "#3A5F7D",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "柔雾樱花粉配合水蓝，中文用典雅楷体表现含蓄感，日文选用圆润的Rodin字体增添元气",
+    },
+    "撕裂爆发": {
+        "ch_font": "Source Han Sans CN",
+        "ch_size": 55,
+        "ch_color": "#FF4D4D",
+        "ch_outline": "#990000",
+        "jp_font": "FOT-Rodin Pro M",
+        "jp_size": 35,
+        "jp_color": "#4DA6FF",
+        "jp_outline": "#003366",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "红蓝强对比配色体现撕裂情绪与爆发力",
+    },
+    "摇滚撕裂": {
+        "ch_font": "Source Han Sans CN",
+        "ch_size": 55,
+        "ch_color": "#FF6B6B",
+        "ch_outline": "#8B0000",
+        "jp_font": "FOT-Rodin Pro M",
+        "jp_size": 35,
+        "jp_color": "#4ECDC4",
+        "jp_outline": "#006D75",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "红蓝对冲的撕裂感配色，强化摇滚情绪的爆发张力",
+    },
+    "都市霓虹微光": {
+        "ch_font": "Source Han Sans CN",
+        "ch_size": 55,
+        "ch_color": "#E5B8FF",
+        "ch_outline": "#4A225D",
+        "jp_font": "FOT-Rodin Pro M",
+        "jp_size": 35,
+        "jp_color": "#FFB8E5",
+        "jp_outline": "#5D224A",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "现代R&B夜游风的霓虹渐变配色，紫色与粉色形成时尚碰撞",
+    },
+    "青春遗憾与热血交织": {
+        "ch_font": "Source Han Sans CN",
+        "ch_size": 55,
+        "ch_color": "#FFD166",
+        "ch_outline": "#18181B",
+        "jp_font": "FOT-Rodin Pro M",
+        "jp_size": 35,
+        "jp_color": "#EF476F",
+        "jp_outline": "#18181B",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "清新暖调中的青春校园感，黄色和粉色搭配既俏皮又有视觉层次",
+    },
+    "淡蓝与浅粉的双色交响": {
+        "ch_font": "LXGW WenKai",
+        "ch_size": 55,
+        "ch_color": "#FFD6E7",
+        "ch_outline": "#6D4C5D",
+        "jp_font": "Yu Mincho",
+        "jp_size": 35,
+        "jp_color": "#E0E0E0",
+        "jp_outline": "#6D6D6D",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "浅粉中文与灰调日文在淡蓝背景上的双色对比，温柔而不失层次",
+    },
+    "City Pop 电台": {
+        "ch_font": "Microsoft YaHei",
+        "ch_size": 55,
+        "ch_color": "#FFF9F0",
+        "ch_outline": "#1A237E",
+        "jp_font": "FOT-Rodin Pro M",
+        "jp_size": 35,
+        "jp_color": "#FFF9F0",
+        "jp_outline": "#BF360C",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "奶油白配深蓝与橙红的高对比City Pop风格，复刻电台访谈的鲜活气质",
+    },
+    "现代日系播客极简主义": {
+        "ch_font": "Source Han Sans CN",
+        "ch_size": 55,
+        "ch_color": "#FFFFFF",
+        "ch_outline": "#0F1322",
+        "jp_font": "FOT-Rodin Pro M",
+        "jp_size": 35,
+        "jp_color": "#FFFFFF",
+        "jp_outline": "#0F1322",
+        "outline_size": 3,
+        "shadow_size": 1,
+        "description": "纯白字幕配藏青描边，强对比高辨识度的杂志级字幕设计",
+    },
 }
 
 
@@ -214,8 +345,10 @@ class ASSMaker:
         return f"Dialogue: 0,{block.start_ass},{block.end_ass},Default,,0,0,0,,{text}"
 
     def _style_text(self, lines: list[str], config: dict[str, Any], fade: str) -> str:
-        ch_font = str(config.get("ch_font", "Microsoft YaHei"))
-        jp_font = str(config.get("jp_font", "Meiryo"))
+        # Presets store the family the user picked; the ASS text must carry the
+        # name the font matcher can actually find.
+        ch_font = resolve_render_family(str(config.get("ch_font", "Microsoft YaHei")))
+        jp_font = resolve_render_family(str(config.get("jp_font", "Meiryo")))
         ch_size = int(config.get("ch_size", 55))
         jp_size = int(config.get("jp_size", 35))
         outline_size = int(config.get("outline_size", 3))
