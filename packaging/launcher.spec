@@ -40,6 +40,8 @@ excluded_heavy_modules = [
 datas = []
 datas += collect_data_files("customtkinter")
 datas += [(str(PROJECT_ROOT / "engine" / "demucs_runner.py"), "engine")]
+datas += [(str(PROJECT_ROOT / "assets" / "utasync.png"), "assets")]
+datas += [(str(PROJECT_ROOT / "assets" / "utasync.ico"), "assets")]
 
 local_hiddenimports = []
 for package_name in ("controllers", "core", "engine", "ui", "utils"):
@@ -54,6 +56,11 @@ a = Analysis(
     + [
         "tkinterdnd2",
         "PIL._tkinter_finder",
+        "openai",
+        "httpx",
+        "huggingface_hub",
+        "requests",
+        "tools.subtitle_reviewer",
     ],
     hookspath=[],
     hooksconfig={},
@@ -80,7 +87,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon=str(PROJECT_ROOT / "assets" / "utasync.ico"),
 )
 
 coll = COLLECT(

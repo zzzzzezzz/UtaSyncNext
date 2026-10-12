@@ -1,0 +1,65 @@
+{
+  "status": "passed",
+  "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\ui_restart_fresh_20260918\\input\\yama_ui_restart.wav",
+  "phases": {
+    "interrupt": {
+      "status": "passed",
+      "phase": "interrupt",
+      "checks": {
+        "before_close": {
+          "status": "🌍 正在调用大模型翻译...",
+          "run_button": "⏹ 取消任务 · 正在调用大模型翻译...",
+          "console_has_cache_hit": true
+        },
+        "worker_stopped": true,
+        "cancel_created_error_log": false,
+        "source_srt_hash_unchanged": true,
+        "source_srt_mtime_unchanged": true,
+        "media_path_saved_for_restart": true
+      },
+      "source_srt_sha256": "6689259b76eaf5f6014e02c93a388b0dfb80a1b2dca71b53ff5aeb54368b2e94",
+      "process_returncode": 0,
+      "stdout": "PASS: interrupt window closed cleanly.",
+      "stderr": ""
+    },
+    "resume": {
+      "status": "passed",
+      "phase": "resume",
+      "checks": {
+        "running_state": {
+          "run_button": "⏹ 取消任务 · 正在准备 Next 独立引擎进程...",
+          "preview_has_cache_hit": true
+        },
+        "completed_state": {
+          "elapsed_seconds": 6.7,
+          "run_button": "⚡ 启 动 引 擎",
+          "system_status": "空闲",
+          "output_text": "SRT: yama_ui_restart_极致打轴.srt  |  日志: utasyncnext_performance_20260918_143829.txt",
+          "srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\yama_ui_restart\\subtitles\\yama_ui_restart_极致打轴.srt"
+        },
+        "relevant_console_lines": [
+          "打轴：模型 small",
+          "人声分离：本次跳过，优先快速打轴。",
+          "缓存：已有可复用打轴结果，本次会跳过重新识别。",
+          "打轴：模型 small",
+          "缓存：上次打轴已完整保存，本次跳过重新识别并继续后续处理。",
+          "基础复听检查： 基础检查发现 3 条字幕建议人工复听；缓存没有原始识别置信度，系统没有自动删除任何内容。",
+          "复听检查：诊断文件已保存：yama_ui_restart_极致打轴_识别诊断.json",
+          "性能：打轴阶段耗时：<Next>\\output\\yama_ui_restart\\logs\\utasyncnext_performance_20260918_143829.txt",
+          "打轴：复用已有字幕结果，未重新识别。",
+          "基础复听提醒：从缓存字幕中发现 3 条文本可能需要确认，详情见 yama_ui_restart_极致打轴_识别诊断.json；缓存没有保留原始识别置信度，系统没有自动删除任何字幕。"
+        ],
+        "source_srt_hash_unchanged": true,
+        "source_srt_mtime_unchanged": true
+      },
+      "source_srt_sha256": "6689259b76eaf5f6014e02c93a388b0dfb80a1b2dca71b53ff5aeb54368b2e94",
+      "process_returncode": 0,
+      "stdout": "PASS: restarted window reused completed ASR.",
+      "stderr": ""
+    }
+  },
+  "source_srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\yama_ui_restart\\subtitles\\yama_ui_restart_极致打轴.srt",
+  "source_srt_sha256": "6689259b76eaf5f6014e02c93a388b0dfb80a1b2dca71b53ff5aeb54368b2e94",
+  "external_api_requests": 0,
+  "settings_restored": true
+}

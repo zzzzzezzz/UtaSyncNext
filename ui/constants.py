@@ -17,6 +17,29 @@ FONT_WHITELIST = [
     "Arial", "Impact", "Consolas", "Segoe UI",
 ]
 
+# Keep the default settings panel intentionally small.  The full system font
+# inventory is not a useful primary control: it is noisy, can contain fonts
+# that libass cannot render, and makes the panel expand unpredictably.  A
+# dedicated user-font manager can add more families later without changing
+# this default list.
+CURATED_FONT_FAMILIES = [
+    "Microsoft YaHei",
+    "SimHei",
+    "Meiryo",
+    "Yu Gothic",
+    "Source Han Sans SC",
+    "Source Han Serif SC",
+    "Noto Sans CJK SC",
+    "Noto Serif CJK SC",
+    "Noto Sans CJK JP",
+    "Noto Serif CJK JP",
+    "Noto Sans JP",
+    "Noto Serif JP",
+    "M PLUS 1p",
+    "Zen Kaku Gothic New",
+    "LXGW WenKai",
+]
+
 GARBAGE_FONT_KEYWORDS = {
     "@", "wingdings", "webdings", "symbol", "marlett", "bookshelf", "hololens", "mt extra",
     "baltic", "ce", "cyr", "greek", "tur", "arabic", "himalaya", "tai lue",
@@ -64,4 +87,15 @@ FONT_ALIAS_MAP = {
     "Impact": "粗体海报英文",
     "Consolas": "等宽代码英文",
     "Segoe UI": "微软系统UI字体",
+    "Source Han Sans SC": "思源黑体（简中）",
+    "Source Han Serif SC": "思源宋体（简中）",
+    "Noto Sans CJK SC": "Noto 无衬线（简中）",
+    "Noto Serif CJK SC": "Noto 衬线（简中）",
+    "Noto Sans CJK JP": "Noto 无衬线（日文）",
+    "Noto Serif CJK JP": "Noto 衬线（日文）",
+    "Noto Sans JP": "Noto 无衬线（日文）",
+    "Noto Serif JP": "Noto 衬线（日文）",
+    "M PLUS 1p": "M PLUS 日文正文",
+    "Zen Kaku Gothic New": "Zen 角ゴシック",
+    "LXGW WenKai": "霞鹜文楷",
 }

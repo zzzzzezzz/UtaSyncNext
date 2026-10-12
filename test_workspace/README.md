@@ -24,6 +24,19 @@
 
 只有 `human_approved` 能作为质量基准。自动稿只适合检查结构变化、时间轴完整性、异常前缀和性能，不自动判定翻译优劣。
 
+## 快速听轴校对
+
+音频或长视频不需要先压制成片。使用本地校对器同时载入媒体、原文 SRT 和翻译 SRT：
+
+```powershell
+& '.\.venv\Scripts\python.exe' 'tools\subtitle_reviewer.py' `
+  --media 'F:\path\sample.mp3' `
+  --source-srt 'E:\path\source.srt' `
+  --translated-srt 'E:\path\translated.srt'
+```
+
+浏览器会打开只读校对页。播放时当前原文和译文自动同步，点击字幕行可以直接跳到对应时间。
+
 ## 日常流程
 
 1. 先生成报告，确认素材、参考文件和设置没有漂移。
@@ -38,5 +51,21 @@
 ```
 
 本地报告记录媒体身份、时长、画幅、编码、设置、参考文件、时间轴完整性和疑似说话人前缀。每个用例还应填写 `acceptance_checks` 和 `human_review`，但报告不会宣称翻译质量正确。
+
+正式基线使用严格模式：
+
+```powershell
+.\.venv\Scripts\python.exe tools\regression_workspace.py report `
+  --strict `
+  --fail-on-regression `
+  --output-dir test_workspace\reports\baseline-v1
+```
+
+- `passed`：已配置的客观检查通过。
+- `failed`：出现未登记的结构回归，命令返回失败。
+- `known_failure`：旧参考仍有已经登记、等待刷新的问题；报告保留问题，但不冒充新回归。
+- `not_configured`：素材已进入队列，但还没有人工基准或自动阈值。
+
+自动检查只负责文件存在性、字幕条数、重叠、倒退、双语行数、时间轴映射和明确异常文本。局部测试轴可通过 `source_time_offset_seconds` 映射回原视频时间；删除水印轴的案例可以声明允许缺少的时间轴数量。翻译自然度、听感和是否应补轴仍由人工验收。
 
 `cases.example.json` 展示清单格式。本机实际使用由 Git 忽略的 `cases.local.json`。

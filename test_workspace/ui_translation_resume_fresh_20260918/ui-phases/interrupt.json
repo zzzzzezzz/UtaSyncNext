@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "phase": "interrupt",
+  "checks": {
+    "before_close": {
+      "status": "AI 语境翻译中... 25%",
+      "run_button": "⏹ 取消任务 · 翻译：进度 25%",
+      "clear_cache_state": "disabled",
+      "cache_entries": 1,
+      "console_mentions_batches": false
+    },
+    "close_requested_at": 189435.25,
+    "worker_stopped": true,
+    "cancel_created_error_log": false,
+    "partial_cache_entries": 1,
+    "no_false_completed_srt": true,
+    "no_completion_fingerprint": true,
+    "safe_close_elapsed_seconds": 2.42
+  }
+}

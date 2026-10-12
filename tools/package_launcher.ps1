@@ -12,6 +12,16 @@ $distRoot = Join-Path $nextRoot "dist"
 $isolatedRoot = Join-Path $buildRoot "launcher_source"
 $specPath = Join-Path $isolatedRoot "packaging\launcher.spec"
 $cacheRoot = Join-Path $nextRoot ".cache"
+$runtimeBackupRoot = Join-Path $buildRoot "dist_runtime_backup"
+$runtimeStateNames = @(
+    ".engine",
+    "models_faster",
+    "output",
+    ".cache",
+    "performance",
+    "fonts",
+    "user_settings.json"
+)
 
 function Set-NextBuildCacheEnv {
     $hfHome = Join-Path $cacheRoot "huggingface"
@@ -26,35 +36,49 @@ function Set-NextBuildCacheEnv {
     $env:HF_HUB_DISABLE_XET = "1"
 }
 
-function Remove-DistRuntimeLink {
-    param([string]$Name)
-
-    $target = Join-Path (Join-Path $distRoot "UtaSyncNext") $Name
-    if (-not (Test-Path $target)) {
-        return
+function Backup-DistRuntimeState {
+    if (Test-Path -LiteralPath $runtimeBackupRoot) {
+        Remove-Item -LiteralPath $runtimeBackupRoot -Recurse -Force
     }
+    New-Item -ItemType Directory -Path $runtimeBackupRoot -Force | Out-Null
 
-    $item = Get-Item -LiteralPath $target -Force
-    $isLink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
-    if ($isLink) {
-        [System.IO.Directory]::Delete($target, $false)
-        Write-Host "Removed runtime junction before rebuild: dist\UtaSyncNext\$Name"
-        return
+    $distAppRoot = Join-Path $distRoot "UtaSyncNext"
+    foreach ($name in $runtimeStateNames) {
+        $source = Join-Path $distAppRoot $name
+        if (-not (Test-Path -LiteralPath $source)) {
+            continue
+        }
+        Move-Item -LiteralPath $source -Destination (Join-Path $runtimeBackupRoot $name) -Force
+        Write-Host "Backed up packaged runtime state: dist\UtaSyncNext\$name"
     }
-
-    if ($Name -eq ".cache") {
-        Remove-Item -LiteralPath $target -Recurse -Force
-        Write-Host "Removed packaged runtime cache before rebuild: dist\UtaSyncNext\$Name"
-        return
-    }
-
-    throw "dist\UtaSyncNext\$Name is a real directory, not a junction. Move it before rebuilding the launcher."
 }
 
-function Prepare-DistForRebuild {
-    foreach ($name in @(".engine", "models_faster", ".cache")) {
-        Remove-DistRuntimeLink -Name $name
+function Restore-DistRuntimeState {
+    if (-not (Test-Path -LiteralPath $runtimeBackupRoot)) {
+        return
     }
+
+    $distAppRoot = Join-Path $distRoot "UtaSyncNext"
+    $blocked = @()
+    foreach ($name in $runtimeStateNames) {
+        $backup = Join-Path $runtimeBackupRoot $name
+        if (-not (Test-Path -LiteralPath $backup)) {
+            continue
+        }
+        $target = Join-Path $distAppRoot $name
+        if (Test-Path -LiteralPath $target) {
+            $blocked += $name
+            continue
+        }
+        Move-Item -LiteralPath $backup -Destination $target -Force
+        Write-Host "Restored packaged runtime state: dist\UtaSyncNext\$name"
+    }
+
+    if ($blocked.Count -gt 0) {
+        throw "Cannot restore packaged runtime state: unexpected build paths $($blocked -join ', '). Backups kept in $runtimeBackupRoot"
+    }
+
+    Remove-Item -LiteralPath $runtimeBackupRoot -Recurse -Force
 }
 
 function Reset-IsolatedLauncherSource {
@@ -74,8 +98,14 @@ function Reset-IsolatedLauncherSource {
     }
 
     New-Item -ItemType Directory -Path (Join-Path $isolatedRoot "packaging") | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $isolatedRoot "assets") | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $isolatedRoot "tools") | Out-Null
     Copy-Item -LiteralPath (Join-Path $nextRoot "app.py") -Destination (Join-Path $isolatedRoot "app.py") -Force
     Copy-Item -LiteralPath (Join-Path $nextRoot "packaging\launcher.spec") -Destination $specPath -Force
+    Copy-Item -LiteralPath (Join-Path $nextRoot "packaging\assets\utasync.png") -Destination (Join-Path $isolatedRoot "assets\utasync.png") -Force
+    Copy-Item -LiteralPath (Join-Path $nextRoot "packaging\assets\utasync.ico") -Destination (Join-Path $isolatedRoot "assets\utasync.ico") -Force
+    Copy-Item -LiteralPath (Join-Path $nextRoot "tools\__init__.py") -Destination (Join-Path $isolatedRoot "tools\__init__.py") -Force
+    Copy-Item -LiteralPath (Join-Path $nextRoot "tools\subtitle_reviewer.py") -Destination (Join-Path $isolatedRoot "tools\subtitle_reviewer.py") -Force
 
     Get-ChildItem -LiteralPath $isolatedRoot -Recurse -Directory -Filter "__pycache__" |
         Remove-Item -Recurse -Force
@@ -106,33 +136,36 @@ if ($LASTEXITCODE -ne 0) {
     exit 2
 }
 
-$args = @($specPath, "--noconfirm")
+$pyiArgs = @($specPath, "--noconfirm")
 if ($Clean) {
-    $args += "--clean"
+    $pyiArgs += "--clean"
 }
 
 Write-Host "Building lightweight UtaSyncNext Launcher..."
 Set-NextBuildCacheEnv
-Prepare-DistForRebuild
 Reset-IsolatedLauncherSource
 Write-Host "Spec: $specPath"
+$buildExitCode = 1
 try {
+    Backup-DistRuntimeState
     Set-Location $isolatedRoot
-    & $pythonExe -m PyInstaller @args "--distpath" $distRoot "--workpath" (Join-Path $buildRoot "launcher")
+    & $pythonExe -m PyInstaller @pyiArgs "--distpath" $distRoot "--workpath" (Join-Path $buildRoot "launcher")
+    $buildExitCode = $LASTEXITCODE
 }
 finally {
     Set-Location $nextRoot
+    Restore-DistRuntimeState
 }
 
-if ($LASTEXITCODE -ne 0) {
-    throw "PyInstaller build failed with exit code $LASTEXITCODE."
+if ($buildExitCode -ne 0) {
+    throw "PyInstaller build failed with exit code $buildExitCode."
 }
 
 Write-Host ""
 Write-Host "Launcher build complete:"
 Write-Host "  dist\UtaSyncNext\UtaSyncNext.exe"
 Write-Host ""
-Write-Host "Remember: .engine, models_faster, output, and .cache are external runtime folders."
+Write-Host "Remember: .engine, models_faster, output, .cache, performance, and fonts are external runtime folders."
 
 & $pythonExe tools\check_packaging_size.py
 if ($LASTEXITCODE -ne 0) {

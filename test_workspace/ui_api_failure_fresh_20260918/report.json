@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "endpoint_scope": "127.0.0.1 only",
+  "external_api_requests": 0,
+  "checks": {
+    "elapsed_seconds": 8.36,
+    "ui_state": {
+      "system_status": "空闲",
+      "output_text": "SRT: ui-api-failure-48_极致打轴.srt  |  日志: utasyncnext_error_20260918_144003.txt",
+      "copy_log_state": "normal",
+      "clear_cache_state": "normal",
+      "console": "\n输出：已更新输出目录：E:\\traecode\\UtaSync\\UtaSyncNext\\output\\YOASOBI - LIVE AT “Echoes Baa”［Day2］- MUSIC AWARDS JAPAN 2025\\subtitles\n\n媒体：已选择输入文件：E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\ui_api_failure_fresh_20260918\\input\\ui-api-failure-48.wav\n\n输出：已更新输出目录：E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\subtitles\n\n任务：开始前检查\n媒体：ui-api-failure-48.wav\n打轴：模型 small\n人声分离：本次跳过，优先快速打轴。\n硬件: NVIDIA GeForce GTX 1660 SUPER · 6.0GB；Whisper 会优先尝试 CUDA，失败时自动回退 CPU。\n翻译：没有可复用结果，本次会调用接口。\n翻译：模型 local/translation-resume-test\n网络: 直连或系统代理。\n字幕：仅生成 SRT。\n缓存：已有可复用打轴结果，本次会跳过重新识别。\n缓存：没有可复用翻译结果，本次会请求接口。\n\n系统：已启动独立处理进程。\n系统：拖拽导入已启用，可直接拖入媒体或歌词文件。\n\n\n任务：开始处理：ui-api-failure-48.wav\n任务：本次处理参数\n音频：模式 Live 常规/摇滚\n打轴：模型 small\n性能：策略 本次跳过人声分离，不使用 Demucs 显存档位\n人声分离：本次跳过，直接识别原音频。\n字幕：输出模式 中日双语字幕\n硬件：NVIDIA GeForce GTX 1660 SUPER · 6.0GB；Whisper 会优先尝试 CUDA，失败时自动回退 CPU。\n缓存：上次打轴已完整保存，本次跳过重新识别并继续后续处理。\n基础复听检查： 基础检查发现 48 条字幕建议人工复听；缓存没有原始识别置信度，系统没有自动删除任何内容。\n00:00:00  翻訳再開テスト原文1（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:01  翻訳再開テスト原文2（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:02  翻訳再開テスト原文3（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:03  翻訳再開テスト原文4（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:03  翻訳再開テスト原文5（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:04  翻訳再開テスト原文6（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n其余 42 条请查看诊断文件。\n复听检查：诊断文件已保存：ui-api-failure-48_极致打轴_识别诊断.json\n网络：翻译请求使用直连或系统代理。\n\n翻译：启动大模型翻译。\n翻译：未提供参考歌词，本次使用盲翻。\n本次翻译模型: local/translation-resume-test\n翻译：开始处理，共 4 批，并发 2。\n\n翻译：任务未完成，具体原因已保存到错误日志。\n翻译：请检查接口密钥、服务地址、模型名称或代理设置；已完成批次不会丢失。\n\n输出：已更新输出目录：E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\subtitles\n\n日志：错误详情已保存：utasyncnext_error_20260918_144003.txt\n恢复：可复用结果：原文打轴。原文打轴和校验信息已保留。使用相同媒体与设置再次启动，会跳过重新听写。\n任务：处理未完成，请查看错误日志和恢复建议。\n\n",
+      "outputs": {
+        "output_dir": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\subtitles",
+        "srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\subtitles\\ui-api-failure-48_极致打轴.srt",
+        "asr_diagnostics": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\subtitles\\ui-api-failure-48_极致打轴_识别诊断.json",
+        "log": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\logs\\utasyncnext_error_20260918_144003.txt",
+        "recovery_report": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\logs\\utasyncnext_recovery_20260918_144003.json"
+      }
+    },
+    "requested_batches": [
+      1,
+      2
+    ],
+    "error_log": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\logs\\utasyncnext_error_20260918_144003.txt",
+    "recovery_report": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\logs\\utasyncnext_recovery_20260918_144003.json",
+    "api_trace": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-api-failure-48\\subtitles\\ui-api-failure-48_极致打轴_api_trace.json",
+    "source_srt_retained": true,
+    "no_false_translation_output": true
+  },
+  "settings_restored": true
+}

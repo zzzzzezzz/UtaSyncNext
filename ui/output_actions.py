@@ -7,7 +7,7 @@ from pathlib import Path
 from tkinter import messagebox
 from typing import Any
 
-from engine.cache_env import app_root
+from engine.cache_env import app_root, task_base_name
 
 
 class OutputActionRunner:
@@ -15,6 +15,7 @@ class OutputActionRunner:
 
     def __init__(self, host: Any) -> None:
         self.host = host
+        self._review_handles: list[Any] = []
 
     def set_last_outputs(self, artifacts: dict[str, object]) -> None:
         self.host.last_outputs = {key: str(value) for key, value in artifacts.items() if value}
@@ -58,6 +59,46 @@ class OutputActionRunner:
         self.host.update()
         self.host.append_log(f"\n📋 [路径已复制] {target_path}\n")
 
+    def open_subtitle_reviewer(self) -> None:
+        self.refresh_existing_outputs()
+        media_path = self.host.last_outputs.get("media") or str(self.host.media_path or "")
+        source_path = self.host.last_outputs.get("source_srt", "")
+        translated_path = self.host.last_outputs.get("translated_srt", "")
+        final_path = self.host.last_outputs.get("srt", "")
+
+        if not media_path or not Path(media_path).is_file():
+            messagebox.showwarning("提示", "没有找到用于校对的原媒体文件。", parent=self.host)
+            return
+        if not source_path and final_path:
+            source_path = final_path
+        if translated_path == source_path:
+            translated_path = ""
+        if not source_path and not translated_path:
+            messagebox.showwarning("提示", "没有找到可校对的 SRT 字幕。", parent=self.host)
+            return
+
+        try:
+            from tools.subtitle_reviewer import start_review_server
+
+            handle = start_review_server(
+                Path(media_path).resolve(),
+                Path(source_path).resolve() if source_path and Path(source_path).is_file() else None,
+                Path(translated_path).resolve() if translated_path and Path(translated_path).is_file() else None,
+            )
+            self._review_handles = [item for item in self._review_handles if item.is_alive]
+            self._review_handles.append(handle)
+            self.host.append_log("\n🎧 [听轴校对] 已打开原媒体与字幕，无需先压制视频。\n")
+        except Exception as exc:
+            messagebox.showerror("校对器启动失败", f"无法打开听轴校对：{exc}", parent=self.host)
+
+    def close_reviewers(self) -> None:
+        for handle in self._review_handles:
+            try:
+                handle.close()
+            except Exception:
+                pass
+        self._review_handles.clear()
+
     def refresh_existing_outputs(self) -> None:
         artifacts = self._find_existing_outputs()
         if artifacts:
@@ -67,11 +108,23 @@ class OutputActionRunner:
             self.host.workspace.update_outputs({})
 
     def clear_cache(self) -> None:
+        controller = getattr(self.host, "controller", None)
+        task_running = bool(controller and getattr(controller, "is_running", False))
+        burn_thread = getattr(self.host, "burn_thread", None)
+        burn_running = bool(burn_thread and burn_thread.is_alive())
+        if task_running or burn_running:
+            messagebox.showwarning(
+                "任务处理中",
+                "当前任务仍在使用中间文件，请先取消或等待任务结束，再清理空间。",
+                parent=self.host,
+            )
+            return
+
         if not self.host.media_path:
             messagebox.showwarning("提示", "请先导入或处理一个媒体文件，再清理当前任务缓存。", parent=self.host)
             return
 
-        base_name = Path(self.host.media_path).stem
+        base_name = task_base_name(self.host.media_path)
         output_root = app_root() / "output" / base_name
         if not output_root.exists():
             messagebox.showinfo("清理空间", "当前媒体还没有生成 Next 输出目录，无需清理。", parent=self.host)
@@ -117,7 +170,7 @@ class OutputActionRunner:
         if not self.host.media_path:
             return {}
 
-        base_name = Path(self.host.media_path).stem
+        base_name = task_base_name(self.host.media_path)
         output_root = app_root() / "output" / base_name
         subtitles_dir = output_root / "subtitles"
         log_dir = output_root / "logs"
@@ -129,6 +182,8 @@ class OutputActionRunner:
             if subtitles_dir.exists()
             else []
         )
+        source_srt = subtitles_dir / f"{base_name}_极致打轴.srt"
+        translated_candidates = [path for path in srt_candidates if path.resolve() != source_srt.resolve()]
         ass_candidates = (
             sorted(subtitles_dir.glob(f"{base_name}*.ass"), key=self._output_priority, reverse=True)
             if subtitles_dir.exists()
@@ -139,17 +194,45 @@ class OutputActionRunner:
             if log_dir.exists()
             else []
         )
-        output_dir = subtitles_dir if subtitles_dir.exists() else log_dir
+        performance_candidates = (
+            sorted(log_dir.glob("utasyncnext_performance_*.txt"), key=lambda path: path.stat().st_mtime, reverse=True)
+            if log_dir.exists()
+            else []
+        )
+        burn_log_candidates = (
+            sorted(log_dir.glob("utasyncnext_burn_error_*.txt"), key=lambda path: path.stat().st_mtime, reverse=True)
+            if log_dir.exists()
+            else []
+        )
+        video_candidates = sorted(
+            [
+                *output_root.glob(f"{base_name}*硬字幕成品*.mp4"),
+                *output_root.glob(f"{base_name}*硬字幕成品*.mkv"),
+            ],
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        output_dir = output_root if video_candidates else subtitles_dir if subtitles_dir.exists() else log_dir
         artifacts: dict[str, str] = {
             "output_dir": str(output_dir.resolve()),
             "media": str(Path(self.host.media_path).resolve()),
         }
         if srt_candidates:
             artifacts["srt"] = str(srt_candidates[0].resolve())
+        if source_srt.is_file():
+            artifacts["source_srt"] = str(source_srt.resolve())
+        if translated_candidates:
+            artifacts["translated_srt"] = str(translated_candidates[0].resolve())
         if ass_candidates:
             artifacts["ass"] = str(ass_candidates[0].resolve())
         if log_candidates:
             artifacts["log"] = str(log_candidates[0].resolve())
+        elif burn_log_candidates:
+            artifacts["log"] = str(burn_log_candidates[0].resolve())
+        elif performance_candidates:
+            artifacts["log"] = str(performance_candidates[0].resolve())
+        if video_candidates:
+            artifacts["video"] = str(video_candidates[0].resolve())
         return artifacts
 
     def _output_priority(self, path: Path) -> tuple[int, float]:

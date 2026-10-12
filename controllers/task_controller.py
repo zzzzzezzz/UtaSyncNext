@@ -10,6 +10,9 @@ from typing import Any
 from engine.cache_env import app_root
 from engine.pipeline_worker import run_pipeline_worker
 from engine.protocol import MSG_DONE, MSG_ERROR, MSG_LOG, MSG_PROGRESS, MSG_STATUS
+from engine.status import inspect_engine_lightweight
+from engine.task_recovery import write_failure_reports
+from utils.ffmpeg_tools import ffmpeg_status_text, inspect_ffmpeg
 from utils.process_tools import kill_process_tree
 
 
@@ -27,6 +30,7 @@ class TaskController:
         self._current_payload: dict[str, object] = {}
         self._run_log: list[str] = []
         self._last_error_log_path: Path | None = None
+        self._last_status_text = ""
 
     def toggle_task(self) -> None:
         if self.is_running:
@@ -39,6 +43,11 @@ class TaskController:
         self._current_payload = payload
         self._run_log = []
         self._last_error_log_path = None
+        self._last_status_text = "正在启动任务。"
+        if hasattr(self.app, "mark_task_preflight"):
+            self.app.mark_task_preflight()
+        if not self._dependencies_ready():
+            return
         if hasattr(self.app, "append_task_preview"):
             self.app.append_task_preview(payload)
         self.msg_queue = mp.Queue()
@@ -56,9 +65,30 @@ class TaskController:
         self.app.append_log("已启动 Next 独立管线 worker。\n")
         self._ensure_polling()
 
+    def _dependencies_ready(self) -> bool:
+        """Block a task before spawning a worker when required tools are absent."""
+        engine_status = inspect_engine_lightweight()
+        if not engine_status.ready:
+            message = f"任务未启动：{engine_status.label}。{engine_status.detail}"
+            self.app.append_log(f"\n❌ {message}\n")
+            if hasattr(self.app, "mark_task_finished"):
+                self.app.mark_task_finished(message, success=False)
+            return False
+
+        ffmpeg_paths = inspect_ffmpeg()
+        if not all(ffmpeg_paths.get(name) for name in ("ffmpeg", "ffprobe")):
+            message = f"任务未启动：{ffmpeg_status_text(ffmpeg_paths)}。"
+            self.app.append_log(f"\n❌ {message}\n")
+            if hasattr(self.app, "mark_task_finished"):
+                self.app.mark_task_finished(message, success=False)
+            return False
+        return True
+
     def cancel_task(self) -> None:
         if self.cancel_event:
             self.cancel_event.set()
+        if hasattr(self.app, "mark_task_cancelling"):
+            self.app.mark_task_cancelling()
         self._cancel_started_at = time.monotonic()
         self.app.update_status(0.0, "正在取消任务...")
         self._record_log("已请求取消，正在等待 worker 安全退出...\n")
@@ -67,19 +97,21 @@ class TaskController:
     def _ensure_polling(self) -> None:
         if not self._poll_started:
             self._poll_started = True
-            self.app.after(50, self._poll_worker_messages)
+            self.app.after(80, self._poll_worker_messages)
 
     def _poll_worker_messages(self) -> None:
         msg_queue = self.msg_queue
+        messages: list[dict[str, Any]] = []
         if msg_queue:
-            while True:
+            for _ in range(200):
                 try:
                     message = msg_queue.get_nowait()
                 except queue.Empty:
                     break
-                self._handle_message(message)
-                if self.msg_queue is None or self.msg_queue is not msg_queue:
+                messages.append(message)
+                if message.get("type") in {MSG_DONE, MSG_ERROR}:
                     break
+            self._handle_message_batch(messages)
 
         if self.worker_process and not self.worker_process.is_alive() and self.is_running:
             self.worker_process.join(timeout=0.1)
@@ -100,25 +132,65 @@ class TaskController:
             self._finish_task("已终止 worker 子进程树。", progress=0.0)
 
         if self.is_running or self.worker_process or self.msg_queue:
-            self.app.after(50, self._poll_worker_messages)
+            self.app.after(16 if len(messages) >= 200 else 80, self._poll_worker_messages)
         else:
             self._poll_started = False
+
+    def _handle_message_batch(self, messages: list[dict[str, Any]]) -> None:
+        """Coalesce noisy worker output so Tk redraws once per poll, not once per line."""
+        log_chunks: list[str] = []
+        latest_status: tuple[float, str] | None = None
+
+        def flush_ui() -> None:
+            nonlocal latest_status
+            if log_chunks:
+                self.app.append_log("".join(log_chunks))
+                log_chunks.clear()
+            if latest_status is not None:
+                self.app.update_status(*latest_status)
+                latest_status = None
+
+        for message in messages:
+            msg_type = message.get("type")
+            if msg_type == MSG_LOG:
+                text = str(message.get("text", ""))
+                self._record_log(text)
+                if not text.lstrip().startswith("Traceback (most recent call last):"):
+                    log_chunks.append(text)
+                continue
+            if msg_type in {MSG_PROGRESS, MSG_STATUS}:
+                progress_value = float(message.get("progress", 0.0))
+                text = str(message.get("text", ""))
+                prefix = "progress" if msg_type == MSG_PROGRESS else "status"
+                self._record_log(f"[{prefix} {progress_value:.2f}] {text}\n")
+                self._last_status_text = text
+                latest_status = (progress_value, text)
+                continue
+
+            flush_ui()
+            self._handle_message(message)
+
+        flush_ui()
 
     def _handle_message(self, message: dict[str, Any]) -> None:
         msg_type = message.get("type")
         if msg_type == MSG_LOG:
             text = str(message.get("text", ""))
             self._record_log(text)
+            if text.lstrip().startswith("Traceback (most recent call last):"):
+                return
             self.app.append_log(text)
         elif msg_type == MSG_PROGRESS:
             progress_value = float(message.get("progress", 0.0))
             text = str(message.get("text", ""))
             self._record_log(f"[progress {progress_value:.2f}] {text}\n")
+            self._last_status_text = text
             self.app.update_status(progress_value, text)
         elif msg_type == MSG_STATUS:
             progress_value = float(message.get("progress", 0.0))
             text = str(message.get("text", ""))
             self._record_log(f"[status {progress_value:.2f}] {text}\n")
+            self._last_status_text = text
             self.app.update_status(progress_value, text)
         elif msg_type == MSG_DONE:
             artifacts = message.get("artifacts")
@@ -168,42 +240,33 @@ class TaskController:
     def _publish_error_log(self, error_text: str) -> None:
         if self._last_error_log_path is not None:
             return
-        log_path = self._write_error_log(error_text)
-        if log_path is None:
+        report = self._write_error_log(error_text)
+        if report is None:
             return
 
+        log_path, report_path, recovery = report
         self._last_error_log_path = log_path
-        artifacts = dict(getattr(self.app, "last_outputs", {}) or {})
+        artifacts = dict(recovery.get("artifacts") or {})
         artifacts["log"] = str(log_path)
+        artifacts["recovery_report"] = str(report_path)
         artifacts.setdefault("output_dir", str(log_path.parent))
         if hasattr(self.app, "set_last_outputs"):
             self.app.set_last_outputs(artifacts)
+        reusable = "、".join(str(item) for item in recovery.get("reusable_parts") or []) or "无"
         self.app.append_log(f"\n错误日志已保存: {log_path}\n")
+        self.app.append_log(f"恢复：可复用结果：{reusable}。{recovery.get('advice') or ''}\n")
 
-    def _write_error_log(self, error_text: str) -> Path | None:
+    def _write_error_log(self, error_text: str) -> tuple[Path, Path, dict[str, object]] | None:
         try:
-            media_path = str(self._current_payload.get("media_path") or getattr(self.app, "media_path", "") or "")
-            media_name = Path(media_path).name if media_path else "未选择媒体"
-            base_name = Path(media_path).stem if media_path else "general"
-            log_dir = app_root() / "output" / base_name / "logs" if base_name else app_root() / "logs"
-            log_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            log_path = log_dir / f"utasyncnext_error_{timestamp}.txt"
-            content = "\n".join(
-                [
-                    "UtaSyncNext 错误日志",
-                    f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                    f"媒体: {media_name}",
-                    f"媒体路径: {media_path or '未选择'}",
-                    f"错误: {error_text}",
-                    "",
-                    "---- 原始任务日志 ----",
-                    "".join(self._run_log).strip(),
-                    "",
-                ]
+            payload = dict(self._current_payload)
+            if not payload.get("media_path"):
+                payload["media_path"] = str(getattr(self.app, "media_path", "") or "")
+            return write_failure_reports(
+                payload=payload,
+                error_text=error_text,
+                run_log=self._run_log,
+                last_status=self._last_status_text,
             )
-            log_path.write_text(content, encoding="utf-8")
-            return log_path
         except Exception as exc:
             self.app.append_log(f"\n错误日志保存失败: {exc}\n")
             return None

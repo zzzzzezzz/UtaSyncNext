@@ -1,0 +1,548 @@
+{
+  "id": "majiko-kokoronashi-preserve-negative",
+  "description": "Aligned real lyrics must not overwrite overlapping source cues without strict evidence.",
+  "status": "PASS",
+  "elapsed_seconds": 158.63,
+  "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\心做\\audio\\f8ec283b_源音频.wav",
+  "window": {
+    "start": 180.0,
+    "end": 202.0
+  },
+  "expected_lines": [
+    "君にどれだけ愛されても",
+    "僕の心臓は一つだけ",
+    "やめてよ やめてよ"
+  ],
+  "source_srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\心做\\subtitles\\心做_极致打轴.srt",
+  "source_srt_sha256_before": "323A55FF18D1FB1838EAB15042F56B519196F71529730DC4A0D0D0DD209E11CE",
+  "source_srt_sha256_after": "323A55FF18D1FB1838EAB15042F56B519196F71529730DC4A0D0D0DD209E11CE",
+  "preview_written": true,
+  "preview_path": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix\\majiko-kokoronashi-preserve-negative\\lyric_alignment_preview.srt",
+  "full_preview_written": false,
+  "full_preview_path": "",
+  "full_preview_rejection_reason": "word_probability_below_strict_threshold",
+  "blocking_source_cue": null,
+  "replaced_source_cues": [],
+  "expectations": {
+    "minimum_lyrics_matches": 3,
+    "expect_preview_written": true,
+    "expect_full_preview_written": false,
+    "expect_source_unchanged": true
+  },
+  "evaluation": {
+    "passed": true,
+    "failures": []
+  },
+  "generic_probe": {
+    "label": "source_generic",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix\\majiko-kokoronashi-preserve-negative\\source_window.wav",
+    "prompt_contains_expected_lyrics": false,
+    "segment_count": 1,
+    "matched_line_count": 0,
+    "average_match_score": 0.1162,
+    "matches": [
+      {
+        "expected": "君にどれだけ愛されても",
+        "detected": "※演奏中の様子をご覧ください。",
+        "score": 0.1667,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "僕の心臓は一つだけ",
+        "detected": "※演奏中の様子をご覧ください。",
+        "score": 0.1818,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "やめてよ やめてよ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      }
+    ],
+    "segments": [
+      {
+        "start": 187.32,
+        "end": 200.78,
+        "text": "※演奏中の様子をご覧ください。",
+        "avg_logprob": -1.7076,
+        "no_speech_prob": 0.2681,
+        "words": [
+          {
+            "start": 187.32,
+            "end": 188.72,
+            "word": "※",
+            "probability": 0.1538
+          },
+          {
+            "start": 188.72,
+            "end": 188.74,
+            "word": "演",
+            "probability": 0.0011
+          },
+          {
+            "start": 188.74,
+            "end": 191.14,
+            "word": "奏",
+            "probability": 0.9507
+          },
+          {
+            "start": 191.14,
+            "end": 191.14,
+            "word": "中",
+            "probability": 0.5312
+          },
+          {
+            "start": 191.14,
+            "end": 191.96,
+            "word": "の",
+            "probability": 0.0966
+          },
+          {
+            "start": 191.96,
+            "end": 192.46,
+            "word": "様",
+            "probability": 0.4541
+          },
+          {
+            "start": 192.46,
+            "end": 192.48,
+            "word": "子",
+            "probability": 0.9531
+          },
+          {
+            "start": 192.48,
+            "end": 192.62,
+            "word": "を",
+            "probability": 0.0985
+          },
+          {
+            "start": 192.62,
+            "end": 192.64,
+            "word": "ご",
+            "probability": 0.2786
+          },
+          {
+            "start": 192.64,
+            "end": 198.8,
+            "word": "覧",
+            "probability": 0.8857
+          },
+          {
+            "start": 198.8,
+            "end": 200.78,
+            "word": "ください。",
+            "probability": 0.6841
+          }
+        ]
+      }
+    ],
+    "elapsed_seconds": 77.48
+  },
+  "lyrics_probe": {
+    "label": "source_lyrics",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix\\majiko-kokoronashi-preserve-negative\\source_window.wav",
+    "prompt_contains_expected_lyrics": true,
+    "segment_count": 7,
+    "matched_line_count": 3,
+    "average_match_score": 1.0,
+    "matches": [
+      {
+        "expected": "君にどれだけ愛されても",
+        "detected": "君にどれだけ愛されても",
+        "score": 1.0,
+        "start": 187.16,
+        "end": 192.06,
+        "accepted": true,
+        "evidence": "word_timestamps",
+        "average_word_probability": 0.8663
+      },
+      {
+        "expected": "僕の心臓は一つだけ",
+        "detected": "僕の心臓は一つだけ",
+        "score": 1.0,
+        "start": 192.06,
+        "end": 197.84,
+        "accepted": true,
+        "evidence": "word_timestamps",
+        "average_word_probability": 0.8299
+      },
+      {
+        "expected": "やめてよ やめてよ",
+        "detected": "やめてよやめてよ",
+        "score": 1.0,
+        "start": 197.84,
+        "end": 200.8,
+        "accepted": true,
+        "evidence": "word_timestamps",
+        "average_word_probability": 0.6066
+      }
+    ],
+    "segments": [
+      {
+        "start": 180.0,
+        "end": 181.28,
+        "text": "易しい pushes and pushes",
+        "avg_logprob": -2.0884,
+        "no_speech_prob": 0.0086,
+        "words": [
+          {
+            "start": 180.0,
+            "end": 180.0,
+            "word": "易",
+            "probability": 0.0
+          },
+          {
+            "start": 180.0,
+            "end": 180.0,
+            "word": "しい",
+            "probability": 0.0217
+          },
+          {
+            "start": 180.0,
+            "end": 181.18,
+            "word": "pushes",
+            "probability": 0.0
+          },
+          {
+            "start": 181.18,
+            "end": 181.18,
+            "word": "and",
+            "probability": 0.0488
+          },
+          {
+            "start": 181.18,
+            "end": 181.28,
+            "word": "pushes",
+            "probability": 0.4551
+          }
+        ]
+      },
+      {
+        "start": 181.28,
+        "end": 185.24,
+        "text": "易しい pushes and pushes",
+        "avg_logprob": -2.0884,
+        "no_speech_prob": 0.0086,
+        "words": [
+          {
+            "start": 181.28,
+            "end": 182.34,
+            "word": "易",
+            "probability": 0.0003
+          },
+          {
+            "start": 182.34,
+            "end": 183.06,
+            "word": "しい",
+            "probability": 0.9873
+          },
+          {
+            "start": 183.06,
+            "end": 183.58,
+            "word": "pus",
+            "probability": 0.0707
+          },
+          {
+            "start": 183.58,
+            "end": 183.58,
+            "word": "hes",
+            "probability": 0.9043
+          },
+          {
+            "start": 183.58,
+            "end": 185.08,
+            "word": "an",
+            "probability": 0.0811
+          },
+          {
+            "start": 185.08,
+            "end": 185.08,
+            "word": "d",
+            "probability": 0.999
+          },
+          {
+            "start": 185.08,
+            "end": 185.24,
+            "word": "pu",
+            "probability": 0.1545
+          },
+          {
+            "start": 185.24,
+            "end": 185.24,
+            "word": "sh",
+            "probability": 0.895
+          },
+          {
+            "start": 185.24,
+            "end": 185.24,
+            "word": "es",
+            "probability": 0.9961
+          }
+        ]
+      },
+      {
+        "start": 186.0,
+        "end": 187.16,
+        "text": "frosty hard",
+        "avg_logprob": -2.0884,
+        "no_speech_prob": 0.0086,
+        "words": [
+          {
+            "start": 186.0,
+            "end": 187.16,
+            "word": "frost",
+            "probability": 0.0
+          },
+          {
+            "start": 187.16,
+            "end": 187.16,
+            "word": "y",
+            "probability": 0.4104
+          },
+          {
+            "start": 187.16,
+            "end": 187.16,
+            "word": "hard",
+            "probability": 0.0005
+          }
+        ]
+      },
+      {
+        "start": 187.16,
+        "end": 192.06,
+        "text": "君にどれだけ愛されても",
+        "avg_logprob": -2.0884,
+        "no_speech_prob": 0.0086,
+        "words": [
+          {
+            "start": 187.16,
+            "end": 187.16,
+            "word": "君",
+            "probability": 0.0
+          },
+          {
+            "start": 187.16,
+            "end": 187.84,
+            "word": "に",
+            "probability": 0.959
+          },
+          {
+            "start": 187.84,
+            "end": 188.62,
+            "word": "ど",
+            "probability": 0.9341
+          },
+          {
+            "start": 188.62,
+            "end": 188.96,
+            "word": "れ",
+            "probability": 0.9995
+          },
+          {
+            "start": 188.96,
+            "end": 189.82,
+            "word": "だけ",
+            "probability": 0.9629
+          },
+          {
+            "start": 189.82,
+            "end": 190.5,
+            "word": "愛",
+            "probability": 0.9575
+          },
+          {
+            "start": 190.5,
+            "end": 191.16,
+            "word": "さ",
+            "probability": 1.0
+          },
+          {
+            "start": 191.16,
+            "end": 191.48,
+            "word": "れて",
+            "probability": 0.9854
+          },
+          {
+            "start": 191.48,
+            "end": 192.06,
+            "word": "も",
+            "probability": 0.998
+          }
+        ]
+      },
+      {
+        "start": 192.06,
+        "end": 197.84,
+        "text": "僕の心臓は一つだけ",
+        "avg_logprob": -2.0884,
+        "no_speech_prob": 0.0086,
+        "words": [
+          {
+            "start": 192.06,
+            "end": 192.96,
+            "word": "僕",
+            "probability": 0.3091
+          },
+          {
+            "start": 192.96,
+            "end": 193.64,
+            "word": "の",
+            "probability": 0.999
+          },
+          {
+            "start": 193.64,
+            "end": 194.42,
+            "word": "心",
+            "probability": 0.9692
+          },
+          {
+            "start": 194.42,
+            "end": 195.02,
+            "word": "臓",
+            "probability": 0.9983
+          },
+          {
+            "start": 195.02,
+            "end": 195.7,
+            "word": "は",
+            "probability": 0.9897
+          },
+          {
+            "start": 195.7,
+            "end": 196.18,
+            "word": "一",
+            "probability": 0.4402
+          },
+          {
+            "start": 196.18,
+            "end": 196.98,
+            "word": "つ",
+            "probability": 0.999
+          },
+          {
+            "start": 196.98,
+            "end": 197.84,
+            "word": "だけ",
+            "probability": 0.9346
+          }
+        ]
+      },
+      {
+        "start": 197.84,
+        "end": 200.8,
+        "text": "やめてよやめてよ",
+        "avg_logprob": -2.0884,
+        "no_speech_prob": 0.0086,
+        "words": [
+          {
+            "start": 197.84,
+            "end": 198.42,
+            "word": "や",
+            "probability": 0.2272
+          },
+          {
+            "start": 198.42,
+            "end": 198.84,
+            "word": "め",
+            "probability": 0.1165
+          },
+          {
+            "start": 198.84,
+            "end": 198.96,
+            "word": "て",
+            "probability": 0.9585
+          },
+          {
+            "start": 198.96,
+            "end": 199.32,
+            "word": "よ",
+            "probability": 0.9971
+          },
+          {
+            "start": 199.32,
+            "end": 199.8,
+            "word": "や",
+            "probability": 0.2576
+          },
+          {
+            "start": 199.8,
+            "end": 200.26,
+            "word": "め",
+            "probability": 0.2983
+          },
+          {
+            "start": 200.26,
+            "end": 200.38,
+            "word": "て",
+            "probability": 0.999
+          },
+          {
+            "start": 200.38,
+            "end": 200.8,
+            "word": "よ",
+            "probability": 0.9985
+          }
+        ]
+      },
+      {
+        "start": 200.8,
+        "end": 201.98,
+        "text": "易しい pushes and pushes",
+        "avg_logprob": -2.0884,
+        "no_speech_prob": 0.0086,
+        "words": [
+          {
+            "start": 200.8,
+            "end": 201.52,
+            "word": "易",
+            "probability": 0.0186
+          },
+          {
+            "start": 201.52,
+            "end": 201.98,
+            "word": "しい",
+            "probability": 0.9927
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "p",
+            "probability": 0.0592
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "us",
+            "probability": 0.0749
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "hes",
+            "probability": 0.877
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "and",
+            "probability": 0.8447
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "pushes",
+            "probability": 0.7061
+          }
+        ]
+      }
+    ],
+    "elapsed_seconds": 81.08
+  }
+}

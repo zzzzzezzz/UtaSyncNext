@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import json
-import re
-import threading
+import os
 from pathlib import Path
+from tkinter import filedialog, font as tkfont, messagebox
 from typing import Any, Callable
 
 import customtkinter as ctk
 
 from core.ass_maker import ASS_PRESETS
-from ui.constants import FONT_ALIAS_MAP, FONT_WHITELIST, GARBAGE_FONT_KEYWORDS
+from ui.constants import CURATED_FONT_FAMILIES, FONT_ALIAS_MAP
+from ui.font_catalog import (
+    discover_user_fonts,
+    filter_font_families,
+    import_font,
+    import_fonts_from_directory,
+    user_fonts_dir,
+)
 from ui.sidebar_options import (
     ASPECT_RATIO_OPTIONS,
     ASS_DISABLED_OPTION,
@@ -19,7 +26,7 @@ from ui.sidebar_options import (
     FADE_MODE_OPTIONS,
     FONT_SIZE_OPTIONS,
 )
-from ui.theme import ACCENT_GREEN, TEXT_TITLE
+from ui.theme import ACCENT_GREEN, TEXT_HINT, TEXT_TITLE
 
 
 CallbackMap = dict[str, Callable[..., object]]
@@ -41,7 +48,8 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
         self.callbacks = callbacks
         self.get_settings_cb = get_settings_cb
         self.sync_presets_cb = sync_presets_cb
-        self.all_system_fonts: list[str] = []
+        self._user_fonts = discover_user_fonts()
+        self._user_font_families = set(filter_font_families(self._user_fonts))
 
         self.grid_columnconfigure(0, weight=1)
         self._load_user_presets()
@@ -61,56 +69,116 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
         )
         row += 1
 
-        self.font_search_entry = ctk.CTkEntry(
-            self,
-            font=ctk.CTkFont(family="Microsoft YaHei", size=12),
-            placeholder_text="输入中文/英文/拼音过滤找字...",
-            height=30,
-            fg_color="#121212",
-            border_color="#2A2A2A",
-        )
-        self.font_search_entry.grid(row=row, column=0, padx=20, pady=(10, 5), sticky="ew")
-        self.font_search_entry.bind("<KeyRelease>", self._on_font_search)
-        row += 1
-
-        font_options = ["跟随预设"] + [self._format_font_display(name) for name in FONT_WHITELIST]
-        self.all_system_fonts = font_options
+        font_options = self._font_options()
 
         row = self._add_group("主字体 (中文) / 副字体 (日文)", row)
         font_frame = ctk.CTkFrame(self, fg_color="transparent")
         font_frame.grid(row=row, column=0, padx=20, pady=(0, 5), sticky="ew")
         font_frame.grid_columnconfigure((0, 1), weight=1)
-        self.opt_ch_font = ctk.CTkComboBox(
+        self.opt_ch_font = ctk.CTkOptionMenu(
             font_frame,
             font=ctk.CTkFont(family="Microsoft YaHei", size=12),
             values=font_options,
             fg_color="#18181B",
             button_color="#27272A",
+            button_hover_color="#3F3F46",
+            text_color=TEXT_TITLE,
         )
         self.opt_ch_font.set(self._format_font_display(self.settings.get("ch_font_override", "跟随预设")))
         self.opt_ch_font.grid(row=0, column=0, padx=(0, 5), sticky="ew")
-        self.opt_jp_font = ctk.CTkComboBox(
+        self.opt_jp_font = ctk.CTkOptionMenu(
             font_frame,
             font=ctk.CTkFont(family="Microsoft YaHei", size=12),
             values=font_options,
             fg_color="#18181B",
             button_color="#27272A",
+            button_hover_color="#3F3F46",
+            text_color=TEXT_TITLE,
         )
         self.opt_jp_font.set(self._format_font_display(self.settings.get("jp_font_override", "跟随预设")))
         self.opt_jp_font.grid(row=0, column=1, padx=(5, 0), sticky="ew")
         row += 1
-        self._lazy_load_system_fonts()
-
+        font_actions = ctk.CTkFrame(self, fg_color="transparent")
+        font_actions.grid(row=row, column=0, padx=20, pady=(0, 8), sticky="ew")
+        font_actions.grid_columnconfigure(0, weight=1)
+        self.font_catalog_hint = ctk.CTkLabel(
+            font_actions,
+            text=self._font_catalog_hint(),
+            font=ctk.CTkFont(family="Microsoft YaHei", size=10),
+            text_color="#94A3B8",
+            justify="left",
+        )
+        self.font_catalog_hint.grid(row=0, column=0, padx=(0, 8), sticky="w")
+        ctk.CTkButton(
+            font_actions,
+            text="导入字体",
+            width=74,
+            height=28,
+            fg_color="#1F2A3A",
+            hover_color="#2F3E55",
+            command=self._import_user_font,
+        ).grid(row=0, column=1, padx=(0, 6))
+        ctk.CTkButton(
+            font_actions,
+            text="批量导入",
+            width=74,
+            height=28,
+            fg_color="#1F2A3A",
+            hover_color="#2F3E55",
+            command=self._import_user_fonts,
+        ).grid(row=0, column=2, padx=(0, 6))
+        ctk.CTkButton(
+            font_actions,
+            text="字体目录",
+            width=74,
+            height=28,
+            fg_color="#1F2A3A",
+            hover_color="#2F3E55",
+            command=self._open_user_fonts_dir,
+        ).grid(row=0, column=3)
+        ctk.CTkButton(
+            font_actions,
+            text="刷新",
+            width=54,
+            height=28,
+            fg_color="#1F2A3A",
+            hover_color="#2F3E55",
+            command=self._refresh_font_options,
+        ).grid(row=0, column=4, padx=(6, 0))
+        row += 1
         row = self._add_group("主字号 (中文) / 副字号 (日文)", row)
         size_frame = ctk.CTkFrame(self, fg_color="transparent")
         size_frame.grid(row=row, column=0, padx=20, pady=(0, 10), sticky="ew")
         size_frame.grid_columnconfigure((0, 1), weight=1)
-        self.opt_ch_size = ctk.CTkComboBox(size_frame, values=FONT_SIZE_OPTIONS, fg_color="#18181B", button_color="#27272A")
+        self.opt_ch_size = ctk.CTkOptionMenu(
+            size_frame,
+            values=FONT_SIZE_OPTIONS,
+            fg_color="#18181B",
+            button_color="#27272A",
+            button_hover_color="#3F3F46",
+            text_color=TEXT_TITLE,
+        )
         self.opt_ch_size.set(self.settings.get("ch_size_override", "跟随预设"))
         self.opt_ch_size.grid(row=0, column=0, padx=(0, 5), sticky="ew")
-        self.opt_jp_size = ctk.CTkComboBox(size_frame, values=FONT_SIZE_OPTIONS, fg_color="#18181B", button_color="#27272A")
+        self.opt_jp_size = ctk.CTkOptionMenu(
+            size_frame,
+            values=FONT_SIZE_OPTIONS,
+            fg_color="#18181B",
+            button_color="#27272A",
+            button_hover_color="#3F3F46",
+            text_color=TEXT_TITLE,
+        )
         self.opt_jp_size.set(self.settings.get("jp_size_override", "跟随预设"))
         self.opt_jp_size.grid(row=0, column=1, padx=(5, 0), sticky="ew")
+        row += 1
+        ctk.CTkLabel(
+            self,
+            text="选具体字号会覆盖画幅安全区上限；字放大后每行字数会自动收紧，避免越出画面。",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+            text_color=TEXT_HINT,
+            anchor="w",
+            justify="left",
+        ).grid(row=row, column=0, padx=20, pady=(0, 10), sticky="ew")
         row += 1
 
         row = self._add_group("目标画幅比", row)
@@ -160,7 +228,7 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
 
         ctk.CTkButton(
             self,
-            text="浏览花字画廊 & AI 配色",
+            text="打开字幕样式工作台",
             height=36,
             fg_color="#059669",
             hover_color="#047857",
@@ -171,24 +239,30 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
 
         self.check_hires = ctk.CTkSwitch(
             self,
-            text="开启 B站 Hi-Res 无损封装 (.mkv)",
+            text="B站 Hi-Res 小金标（可选：MKV + 32-bit FLAC）",
             text_color=ACCENT_GREEN,
             progress_color=ACCENT_GREEN,
+            command=self._notify_hires_mode,
         )
         if self.settings.get("hires_export", False):
             self.check_hires.select()
         self.check_hires.grid(row=row, column=0, padx=20, pady=(10, 10), sticky="w")
         row += 1
 
-        ctk.CTkButton(
+        self.burn_hint = ctk.CTkLabel(
             self,
-            text="启动底层物理压制 (硬字幕)",
-            height=36,
-            fg_color="#1E3A8A",
-            hover_color="#0284C7",
-            text_color="#FFFFFF",
-            command=self.callbacks.get("burn_video"),
-        ).grid(row=row, column=0, padx=20, pady=(0, 10), sticky="ew")
+            text="默认关闭，避免不必要的大文件；需要上传 B站并保留无损音频时再开启。生成 ASS 后在主界面执行压制。",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+            text_color="#94A3B8",
+            wraplength=300,
+            justify="left",
+        )
+        self.burn_hint.grid(row=row, column=0, padx=20, pady=(0, 10), sticky="w")
+
+    def _notify_hires_mode(self) -> None:
+        callback = self.callbacks.get("burn_mode_changed")
+        if callable(callback):
+            callback(self.check_hires.get() == 1)
 
     def get_settings(self) -> dict[str, str | bool]:
         return {
@@ -223,7 +297,7 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
             self,
             text=text,
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color="#666666",
+            text_color="#A1A1AA",
         ).grid(row=row, column=0, padx=20, pady=(15, 2), sticky="w")
         return row + 1
 
@@ -255,6 +329,8 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
         name = str(font_name or "跟随预设")
         if name == "跟随预设":
             return name
+        if name in self._user_font_families:
+            return f"用户字体 | {name}"
         alias = FONT_ALIAS_MAP.get(name)
         return f"{alias} | {name}" if alias else name
 
@@ -264,75 +340,94 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
             return "跟随预设"
         return text.split(" | ")[-1].strip()
 
-    def _lazy_load_system_fonts(self) -> None:
-        def font_worker() -> None:
-            try:
-                from tkinter import font as tkfont
+    def _font_options(self) -> list[str]:
+        families = self._available_curated_fonts()
+        for family in filter_font_families(self._user_fonts):
+            if family not in families:
+                families.append(family)
+        # Preserve a previously saved choice even when its file is currently
+        # unavailable; silently replacing a task font is worse than showing it.
+        for saved_key in ("ch_font_override", "jp_font_override"):
+            saved_font = str(self.settings.get(saved_key) or "").strip()
+            if saved_font and saved_font != "跟随预设" and saved_font not in families:
+                families.append(saved_font)
+        return ["跟随预设"] + [self._format_font_display(name) for name in families]
 
-                system_fonts = sorted(set(tkfont.families()))
-                cjk_pattern = re.compile(r"[\u4e00-\u9fff\u3040-\u30ff]")
-                cjk_keywords = (
-                    "cjk",
-                    "jp",
-                    "sc",
-                    "tc",
-                    "chinese",
-                    "japanese",
-                    "hei",
-                    "song",
-                    "mincho",
-                    "gothic",
-                    "meiryo",
-                    "yahei",
-                    "sim",
-                    "noto",
-                    "source han",
+    def _available_curated_fonts(self) -> list[str]:
+        """Keep the curated catalog small while hiding fonts absent on this PC."""
+        try:
+            installed = {str(name) for name in tkfont.families(self.winfo_toplevel())}
+        except Exception:
+            installed = set()
+        available = [name for name in CURATED_FONT_FAMILIES if name in installed]
+        # The four original choices remain visible if Tk cannot report the
+        # registry (for example during a headless preview or test harness).
+        return available or list(CURATED_FONT_FAMILIES[:4])
+
+    def _font_catalog_hint(self) -> str:
+        user_count = len(self._user_fonts)
+        curated_count = len(self._available_curated_fonts())
+        return f"精选可用 {curated_count} 种 + 用户字体 {user_count} 种，不扫描全部系统字体。"
+
+    def _refresh_font_options(self, selected_family: str = "") -> None:
+        current_ch = selected_family or self._clean_font_display(self.opt_ch_font.get())
+        current_jp = self._clean_font_display(self.opt_jp_font.get())
+        self._user_fonts = discover_user_fonts()
+        self._user_font_families = set(filter_font_families(self._user_fonts))
+        options = self._font_options()
+        self.opt_ch_font.configure(values=options)
+        self.opt_jp_font.configure(values=options)
+        self.opt_ch_font.set(self._format_font_display(current_ch))
+        self.opt_jp_font.set(self._format_font_display(current_jp))
+        self.font_catalog_hint.configure(text=self._font_catalog_hint())
+
+    def _import_user_font(self) -> None:
+        selected = filedialog.askopenfilename(
+            parent=self.winfo_toplevel(),
+            title="导入字幕字体",
+            filetypes=[("字体文件", "*.ttf *.otf *.ttc *.otc"), ("所有文件", "*.*")],
+        )
+        if not selected:
+            return
+        try:
+            record = import_font(selected)
+            self._refresh_font_options(record.family)
+            messagebox.showinfo(
+                "字体已导入",
+                f"已加入用户字体：{record.family}\n\n保存设置后即可用于 ASS 与视频压制。",
+                parent=self.winfo_toplevel(),
+            )
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("字体导入失败", str(exc), parent=self.winfo_toplevel())
+
+    def _open_user_fonts_dir(self) -> None:
+        directory = user_fonts_dir()
+        if hasattr(os, "startfile"):
+            os.startfile(str(directory))  # type: ignore[attr-defined]
+        else:
+            messagebox.showinfo("字体目录", str(directory), parent=self.winfo_toplevel())
+
+    def _import_user_fonts(self) -> None:
+        source = filedialog.askdirectory(parent=self.winfo_toplevel(), title="选择要导入的字体文件夹")
+        if not source:
+            return
+        try:
+            records = import_fonts_from_directory(source)
+            if not records:
+                messagebox.showinfo(
+                    "没有找到字体",
+                    "所选文件夹第一层没有 .ttf、.otf、.ttc 或 .otc 文件。",
+                    parent=self.winfo_toplevel(),
                 )
-                preferred = [font for font in FONT_WHITELIST if font in system_fonts]
-                other = []
-                for font_name in system_fonts:
-                    lower = font_name.lower()
-                    if font_name in preferred or any(bad in lower for bad in GARBAGE_FONT_KEYWORDS):
-                        continue
-                    if cjk_pattern.search(font_name) or any(key in lower for key in cjk_keywords):
-                        other.append(font_name)
-
-                final_fonts = ["跟随预设"] + [self._format_font_display(font) for font in preferred + other]
-                if len(final_fonts) <= 1:
-                    final_fonts.extend([self._format_font_display("Microsoft YaHei"), self._format_font_display("Meiryo")])
-                self.after(0, lambda: self._update_font_ui(final_fonts))
-            except Exception:
-                pass
-
-        threading.Thread(target=font_worker, daemon=True).start()
-
-    def _update_font_ui(self, font_list: list[str]) -> None:
-        self.all_system_fonts = font_list
-        ch_current = self.opt_ch_font.get()
-        jp_current = self.opt_jp_font.get()
-        self.opt_ch_font.configure(values=font_list)
-        self.opt_jp_font.configure(values=font_list)
-        if ch_current in font_list:
-            self.opt_ch_font.set(ch_current)
-        if jp_current in font_list:
-            self.opt_jp_font.set(jp_current)
-
-    def _on_font_search(self, _event: object) -> None:
-        query = self.font_search_entry.get().lower().strip()
-        font_list = self.all_system_fonts
-        if query:
-            font_list = [font for font in font_list if query in font.lower() and "━━━" not in font]
-            if "跟随预设" not in font_list:
-                font_list.insert(0, "跟随预设")
-
-        ch_current = self.opt_ch_font.get()
-        jp_current = self.opt_jp_font.get()
-        self.opt_ch_font.configure(values=font_list)
-        self.opt_jp_font.configure(values=font_list)
-        if ch_current in font_list:
-            self.opt_ch_font.set(ch_current)
-        if jp_current in font_list:
-            self.opt_jp_font.set(jp_current)
+                return
+            self._refresh_font_options(records[0].family)
+            messagebox.showinfo(
+                "字体已批量导入",
+                f"已导入 {len(records)} 个字体文件。\n\n请在下拉框中选择并保存设置。",
+                parent=self.winfo_toplevel(),
+            )
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("字体导入失败", str(exc), parent=self.winfo_toplevel())
 
     def _load_user_presets(self) -> None:
         preset_file = Path("user_presets.json")
@@ -341,6 +436,6 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
         try:
             data = json.loads(preset_file.read_text(encoding="utf-8"))
             if isinstance(data, dict) and data:
-                ASS_PRESETS.update(data)
+                ASS_PRESETS.update({name: value for name, value in data.items() if not str(name).startswith("AI:")})
         except Exception:
             pass

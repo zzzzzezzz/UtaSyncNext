@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -10,11 +11,30 @@ import wave
 from pathlib import Path
 from typing import Callable
 
+from core.asr_diagnostics import (
+    print_diagnostic_summary,
+    segment_to_record,
+    suppression_reason_for_segment,
+    write_asr_diagnostics,
+)
+from core.lyric_assisted_alignment import (
+    match_expected_lyric_lines,
+    render_aligned_lyrics_srt,
+    segment_records,
+    strict_alignment_rejection_reason,
+)
 from core.subtitle_policy import SubtitleLayoutPolicy, split_timed_subtitle_for_layout
+from engine.cache_env import task_base_name
 from utils.ffmpeg_tools import FFmpegAudioProcessor
 
 
 ProgressCallback = Callable[[float, str], None]
+
+
+# Keep Windows DLL directory handles alive for the lifetime of the worker.
+# Without this, cublas/cudnn can disappear from the loader search path before
+# CTranslate2 creates its CUDA backend.
+_DLL_DIRECTORY_HANDLES: list[object] = []
 
 os.environ.setdefault("OMP_NUM_THREADS", "4")
 os.environ.setdefault("MKL_NUM_THREADS", "4")
@@ -22,12 +42,22 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "4")
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 
+def _atomic_write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        temp_path.write_text(content, encoding="utf-8")
+        os.replace(temp_path, path)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
 class LiveSubtitleGenerator:
     """Next-native audio preparation and Faster-Whisper timing generator."""
 
     def __init__(self, video_path: str, output_dir: str = "output") -> None:
         self.video_path = os.path.abspath(video_path)
-        self.base_name = Path(video_path).stem
+        self.base_name = task_base_name(video_path)
         self.output_dir = os.path.abspath(os.path.join(output_dir, self.base_name))
         self.audio_dir = os.path.join(self.output_dir, "audio")
         self.subs_dir = os.path.join(self.output_dir, "subtitles")
@@ -62,10 +92,17 @@ class LiveSubtitleGenerator:
             "audio_cache_hit": False,
             "asr_backend": "unloaded",
             "asr_elapsed_seconds": 0,
+            "audio_extract_elapsed_seconds": 0.0,
+            "demucs_elapsed_seconds": 0.0,
+            "model_load_elapsed_seconds": 0.0,
+            "transcription_elapsed_seconds": 0.0,
             "cuda_fallback_used": False,
             "demucs_skipped": skip_separation,
             "subtitle_density_splits": 0,
             "subtitle_density_extra_cues": 0,
+            "asr_review_candidates": 0,
+            "asr_diagnostics_path": "",
+            "asr_diagnostics_level": "",
         }
 
         try:
@@ -80,8 +117,16 @@ class LiveSubtitleGenerator:
                 if progress_cb:
                     progress_cb(0.40, "⚡ 跳过分离 (使用缓存)")
             else:
+                stage_started = time.perf_counter()
                 self.extract_audio(progress_cb=progress_cb)
+                self.last_run_summary["audio_extract_elapsed_seconds"] = round(
+                    time.perf_counter() - stage_started, 3
+                )
+                stage_started = time.perf_counter()
                 self.isolate_vocals(skip=skip_separation, hardware_mode=hardware_mode, progress_cb=progress_cb)
+                self.last_run_summary["demucs_elapsed_seconds"] = round(
+                    time.perf_counter() - stage_started, 3
+                )
                 Path(self.strategy_flag_path).write_text(strategy, encoding="utf-8")
 
             srt_path = self.transcribe_to_srt(
@@ -235,7 +280,10 @@ class LiveSubtitleGenerator:
                 self._raise_if_cancelled("已安全切断外部进程", process=process)
                 if task_name and time.time() - last_heartbeat >= 30:
                     elapsed = int(time.time() - start_time)
-                    print(f"      -> ⏳ [系统心跳] {task_name} 正在后台全速运行 (已耗时 {elapsed} 秒)...")
+                    print(
+                        f"      -> ⏳ [系统心跳] {task_name} 正在后台全速运行 "
+                        f"(本段已耗时 {elapsed} 秒)..."
+                    )
                     last_heartbeat = time.time()
                 time.sleep(0.5)
 
@@ -399,11 +447,16 @@ class LiveSubtitleGenerator:
             progress_cb(0.40, "Loading ASR model...")
         self._raise_if_cancelled("ASR model loading cancelled")
 
+        model_started = time.perf_counter()
         self.model = self._load_whisper_model(model_size)
+        self.last_run_summary["model_load_elapsed_seconds"] = round(
+            time.perf_counter() - model_started, 3
+        )
         self._raise_if_cancelled("ASR model loaded but task was cancelled")
 
         srt_path = os.path.join(self.subs_dir, f"{self.base_name}_极致打轴.srt")
         print(f"[ASR] Start transcription mode={audio_type}, backend={self.model_backend}")
+        transcription_started = time.perf_counter()
         try:
             self._write_transcription_srt(
                 srt_path,
@@ -429,8 +482,157 @@ class LiveSubtitleGenerator:
             else:
                 raise
 
+        self.last_run_summary["transcription_elapsed_seconds"] = round(
+            time.perf_counter() - transcription_started, 3
+        )
+
         print(f"[ASR] SRT saved: {srt_path}")
         return srt_path
+
+    def transcribe_window_to_srt(
+        self,
+        start_seconds: float,
+        end_seconds: float,
+        output_path: str | os.PathLike[str],
+        *,
+        audio_type: str,
+        skipped_demucs: bool,
+    ) -> str:
+        """Rescan a short audio window with the already loaded ASR model."""
+        if self.model is None:
+            raise RuntimeError("Whisper model is not loaded for the local rescan.")
+        if start_seconds < 0 or end_seconds <= start_seconds:
+            raise ValueError("Invalid local rescan window.")
+        if end_seconds - start_seconds > 120:
+            raise ValueError("Local rescan window is too long.")
+
+        target = Path(output_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        clip_path = target.with_suffix(".wav")
+        temp_path = target.with_suffix(target.suffix + ".tmp")
+        prompt, _, use_vad, vad_params = self._transcribe_options(audio_type, skipped_demucs)
+        try:
+            self._raise_if_cancelled("歌词缺轴局部重扫已停止")
+            window_source = self.video_path if skipped_demucs else self.vocal_path
+            FFmpegAudioProcessor.extract_audio_window(
+                window_source,
+                str(clip_path),
+                start_seconds,
+                end_seconds,
+            )
+            segments, _ = self.model.transcribe(
+                str(clip_path),
+                language="ja",
+                condition_on_previous_text=False,
+                beam_size=5,
+                initial_prompt=prompt,
+                vad_filter=use_vad,
+                vad_parameters=vad_params,
+            )
+            valid_index = 1
+            with temp_path.open("w", encoding="utf-8") as handle:
+                for segment in segments:
+                    self._raise_if_cancelled("歌词缺轴局部重扫已停止")
+                    text = str(getattr(segment, "text", "")).strip()
+                    if self._should_drop_segment(text):
+                        continue
+                    start = start_seconds + float(getattr(segment, "start", 0.0))
+                    end = start_seconds + float(getattr(segment, "end", 0.0))
+                    if end <= start:
+                        continue
+                    handle.write(f"{valid_index}\n")
+                    handle.write(f"{self._format_timestamp(start)} --> {self._format_timestamp(end)}\n")
+                    handle.write(f"{text}\n\n")
+                    valid_index += 1
+            os.replace(temp_path, target)
+            return str(target)
+        finally:
+            clip_path.unlink(missing_ok=True)
+            temp_path.unlink(missing_ok=True)
+
+    def transcribe_lyric_window_to_srt(
+        self,
+        start_seconds: float,
+        end_seconds: float,
+        output_path: str | os.PathLike[str],
+        *,
+        expected_lines: list[str],
+        skipped_demucs: bool,
+    ) -> dict[str, object]:
+        """Build a strict word-timed lyric candidate without changing source subtitles."""
+        if self.model is None:
+            raise RuntimeError("Whisper model is not loaded for lyric-assisted alignment.")
+        if start_seconds < 0 or end_seconds <= start_seconds:
+            raise ValueError("Invalid lyric alignment window.")
+        if end_seconds - start_seconds > 120:
+            raise ValueError("Lyric alignment window is too long.")
+
+        lyrics = [str(line).strip() for line in expected_lines if str(line).strip()]
+        target = Path(output_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        clip_path = target.with_suffix(".wav")
+        evidence_path = target.with_name(f"{target.stem}_词级对齐证据.json")
+        prompt = "现场演唱可能包含以下歌词，只转写确实唱出的内容：\n" + "\n".join(lyrics)
+        result: dict[str, object] = {
+            "written": False,
+            "output_path": "",
+            "evidence_path": str(evidence_path.resolve()),
+            "rejection_reason": "",
+            "matched_line_count": 0,
+        }
+        try:
+            self._raise_if_cancelled("歌词缺轴词级对齐已停止")
+            window_source = self.video_path if skipped_demucs else self.vocal_path
+            FFmpegAudioProcessor.extract_audio_window(
+                window_source,
+                str(clip_path),
+                start_seconds,
+                end_seconds,
+            )
+            segments_iter, _ = self.model.transcribe(
+                str(clip_path),
+                language="ja",
+                condition_on_previous_text=False,
+                beam_size=5,
+                temperature=0.0,
+                initial_prompt=prompt,
+                vad_filter=False,
+                word_timestamps=True,
+            )
+            records = segment_records(segments_iter, offset_seconds=start_seconds)
+            matches = match_expected_lyric_lines(records, lyrics)
+            rejection = strict_alignment_rejection_reason(matches, lyrics)
+            matched_count = sum(bool(match.get("accepted")) for match in matches)
+            if rejection:
+                target.unlink(missing_ok=True)
+            else:
+                _atomic_write_text(target, render_aligned_lyrics_srt(matches))
+                result["written"] = True
+                result["output_path"] = str(target.resolve())
+            result["rejection_reason"] = rejection
+            result["matched_line_count"] = matched_count
+            _atomic_write_text(
+                evidence_path,
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "policy": "lyrics-gap-word-alignment-v1",
+                        "source_audio": str(Path(window_source).resolve()),
+                        "window": {"start": start_seconds, "end": end_seconds},
+                        "expected_lines": lyrics,
+                        "matched_line_count": matched_count,
+                        "written": not rejection,
+                        "rejection_reason": rejection,
+                        "matches": matches,
+                        "segments": records,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+            )
+            return result
+        finally:
+            clip_path.unlink(missing_ok=True)
 
     def _write_transcription_srt(
         self,
@@ -455,10 +657,55 @@ class LiveSubtitleGenerator:
         )
 
         temp_srt_path = f"{srt_path}.tmp"
+        # The output folder can be removed by cleanup/recovery while a worker
+        # is preparing a task. Recreate it at the final write boundary so the
+        # transcription result is always able to open its temporary SRT.
+        Path(srt_path).parent.mkdir(parents=True, exist_ok=True)
         valid_index = 1
         last_logged_pct = -1
         split_source_segments = 0
         extra_cues = 0
+        diagnostic_segments: list[dict[str, object]] = []
+        suppressed_segments: list[dict[str, object]] = []
+        pending_segment: object | None = None
+        pending_record: dict[str, object] | None = None
+        pending_position = 0
+        candidate_position = 0
+
+        def emit_segment(
+            source_segment: object,
+            record: dict[str, object],
+            position: int,
+            next_record: dict[str, object] | None,
+        ) -> None:
+            nonlocal valid_index, split_source_segments, extra_cues
+            suppression_reason = suppression_reason_for_segment(
+                record,
+                position=position,
+                next_record=next_record,
+            )
+            if suppression_reason:
+                suppressed_segments.append({**record, "suppression_reason": suppression_reason})
+                return
+
+            diagnostic_segments.append(record)
+            timed_parts = split_timed_subtitle_for_layout(
+                str(record["text"]),
+                float(getattr(source_segment, "start", 0.0)),
+                float(getattr(source_segment, "end", 0.0)),
+                layout_policy,
+                max_duration_seconds=max_duration,
+            )
+            if len(timed_parts) > 1:
+                split_source_segments += 1
+                extra_cues += len(timed_parts) - 1
+
+            for part in timed_parts:
+                srt_file.write(f"{valid_index}\n")
+                srt_file.write(f"{self._format_timestamp(part.start)} --> {self._format_timestamp(part.end)}\n")
+                srt_file.write(f"{part.text}\n\n")
+                valid_index += 1
+
         with open(temp_srt_path, "w", encoding="utf-8") as srt_file:
             for segment in segments:
                 self._raise_if_cancelled("ASR transcription cancelled")
@@ -474,31 +721,42 @@ class LiveSubtitleGenerator:
                 if self._should_drop_segment(text):
                     continue
 
-                timed_parts = split_timed_subtitle_for_layout(
-                    text,
-                    segment.start,
-                    segment.end,
-                    layout_policy,
-                )
-                if len(timed_parts) > 1:
-                    split_source_segments += 1
-                    extra_cues += len(timed_parts) - 1
+                candidate_position += 1
+                record = segment_to_record(segment, candidate_position)
+                if pending_segment is not None and pending_record is not None:
+                    emit_segment(pending_segment, pending_record, pending_position, record)
+                pending_segment = segment
+                pending_record = record
+                pending_position = candidate_position
 
-                for part in timed_parts:
-                    start_val = part.start
-                    end_val = part.end
-                    if layout_policy is None or layout_policy.profile not in {"square_safe", "portrait_safe"}:
-                        end_val = min(end_val, start_val + max_duration)
-                    srt_file.write(f"{valid_index}\n")
-                    srt_file.write(f"{self._format_timestamp(start_val)} --> {self._format_timestamp(end_val)}\n")
-                    srt_file.write(f"{part.text}\n\n")
-                    valid_index += 1
+            if pending_segment is not None and pending_record is not None:
+                emit_segment(pending_segment, pending_record, pending_position, None)
 
         os.replace(temp_srt_path, srt_path)
         self.last_run_summary["subtitle_density_splits"] = split_source_segments
         self.last_run_summary["subtitle_density_extra_cues"] = extra_cues
+        self.last_run_summary["asr_auto_suppressed"] = len(suppressed_segments)
+        try:
+            diagnostic_report = write_asr_diagnostics(
+                srt_path,
+                diagnostic_segments,
+                suppressed_segments=suppressed_segments,
+            )
+            diagnostic_summary = diagnostic_report.get("summary") or {}
+            self.last_run_summary["asr_review_candidates"] = int(
+                diagnostic_summary.get("review_candidate_count") or 0
+            )
+            self.last_run_summary["asr_diagnostics_path"] = str(
+                Path(srt_path).with_name(f"{Path(srt_path).stem}_识别诊断.json").resolve()
+            )
+            self.last_run_summary["asr_diagnostics_level"] = "full"
+            print_diagnostic_summary(diagnostic_report, srt_path)
+        except Exception as exc:
+            print(f"[打轴检查] 诊断文件保存失败，字幕结果不受影响: {exc}")
         if split_source_segments:
             print(f"字幕整理：已自动拆分 {split_source_segments} 条过长字幕，新增 {extra_cues} 个连续时间轴。")
+        if suppressed_segments:
+            print(f"字幕整理：已保守过滤 {len(suppressed_segments)} 条明显误识别，详情见诊断文件。")
         if valid_index == 1:
             print("[ASR] No valid subtitle segments were emitted.")
 
@@ -575,7 +833,7 @@ class LiveSubtitleGenerator:
             if not directory.exists():
                 continue
             try:
-                os.add_dll_directory(str(directory))
+                _DLL_DIRECTORY_HANDLES.append(os.add_dll_directory(str(directory)))
             except Exception:
                 pass
 

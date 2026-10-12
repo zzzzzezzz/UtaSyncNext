@@ -62,6 +62,7 @@ class SubtitleMetrics:
     max_duration_seconds: float
     max_text_units: int
     max_lines_per_cue: int
+    single_line_cues: int
     suspected_speaker_labels: dict[str, int]
 
 
@@ -73,14 +74,30 @@ def main() -> int:
     report_parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST), help="Local case manifest path.")
     report_parser.add_argument("--output-dir", default=str(DEFAULT_REPORT_DIR), help="Report directory inside Next.")
     report_parser.add_argument("--strict", action="store_true", help="Fail when required media or references are missing.")
+    report_parser.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Fail when configured objective subtitle checks regress.",
+    )
 
     args = parser.parse_args()
     if args.command == "report":
-        return generate_report(Path(args.manifest), Path(args.output_dir), strict=args.strict)
+        return generate_report(
+            Path(args.manifest),
+            Path(args.output_dir),
+            strict=args.strict,
+            fail_on_regression=args.fail_on_regression,
+        )
     return 2
 
 
-def generate_report(manifest_path: Path, output_dir: Path, *, strict: bool = False) -> int:
+def generate_report(
+    manifest_path: Path,
+    output_dir: Path,
+    *,
+    strict: bool = False,
+    fail_on_regression: bool = False,
+) -> int:
     manifest_path = manifest_path.expanduser().resolve()
     if not manifest_path.exists():
         print(f"[FAIL] Manifest not found: {manifest_path}")
@@ -95,6 +112,7 @@ def generate_report(manifest_path: Path, output_dir: Path, *, strict: bool = Fal
         "manifest": str(manifest_path),
         "workspace_name": data.get("workspace_name", "UtaSyncNext regression lab"),
         "cases": [],
+        "automatic_summary": {"passed": 0, "failed": 0, "known_failure": 0, "not_configured": 0},
     }
 
     missing_required = 0
@@ -102,21 +120,37 @@ def generate_report(manifest_path: Path, output_dir: Path, *, strict: bool = Fal
         case_report, case_missing = inspect_case(case)
         report["cases"].append(case_report)
         missing_required += case_missing
+        report["automatic_summary"][case_report["automatic_status"]] += 1
 
     output_dir = _resolve_output_dir(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     json_path = output_dir / f"regression-report-{stamp}.json"
     markdown_path = output_dir / f"regression-report-{stamp}.md"
-    json_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    markdown_path.write_text(_render_markdown(report), encoding="utf-8")
+    latest_json_path = output_dir / "LATEST.json"
+    latest_markdown_path = output_dir / "LATEST.md"
+    json_content = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
+    markdown_content = _render_markdown(report)
+    json_path.write_text(json_content, encoding="utf-8")
+    markdown_path.write_text(markdown_content, encoding="utf-8")
+    latest_json_path.write_text(json_content, encoding="utf-8")
+    latest_markdown_path.write_text(markdown_content, encoding="utf-8")
 
     print("[PASS] Regression evidence report generated.")
     print(f"- cases: {len(report['cases'])}")
     print(f"- missing required paths: {missing_required}")
+    print(
+        "- automatic cases: "
+        f"pass={report['automatic_summary']['passed']}, "
+        f"fail={report['automatic_summary']['failed']}, "
+        f"known-failure={report['automatic_summary']['known_failure']}, "
+        f"not-configured={report['automatic_summary']['not_configured']}"
+    )
     print(f"- json: {json_path}")
     print(f"- markdown: {markdown_path}")
-    return 1 if strict and missing_required else 0
+    print(f"- latest: {latest_markdown_path}")
+    has_regression = report["automatic_summary"]["failed"] > 0
+    return 1 if (strict and missing_required) or (fail_on_regression and has_regression) else 0
 
 
 def inspect_case(case: dict[str, Any]) -> tuple[dict[str, Any], int]:
@@ -133,6 +167,7 @@ def inspect_case(case: dict[str, Any]) -> tuple[dict[str, Any], int]:
         missing += 1
 
     references: list[dict[str, Any]] = []
+    automatic_checks = case.get("automatic_checks", {})
     for reference in case.get("references", []):
         source_path = _optional_path(reference.get("source_srt"))
         translated_path = _optional_path(reference.get("translated_srt"))
@@ -144,16 +179,41 @@ def inspect_case(case: dict[str, Any]) -> tuple[dict[str, Any], int]:
             missing += 1
 
         comparison = None
+        source_time_offset_seconds = float(reference.get("source_time_offset_seconds") or 0.0)
         if source_info and translated_info and source_info["file"]["exists"] and translated_info["file"]["exists"]:
-            comparison = compare_timelines(source_path, translated_path)
+            comparison = compare_timelines(
+                source_path,
+                translated_path,
+                source_time_offset_seconds=source_time_offset_seconds,
+            )
+        automatic_results = evaluate_reference(
+            automatic_checks,
+            source_info,
+            translated_info,
+            comparison,
+            source_path,
+            translated_path,
+        )
         references.append(
             {
                 "level": reference.get("level", "unknown"),
                 "source": source_info,
                 "translated": translated_info,
                 "timeline_comparison": comparison,
+                "source_time_offset_seconds": source_time_offset_seconds,
+                "automatic_results": automatic_results,
             }
         )
+
+    all_automatic_results = [result for reference in references for result in reference["automatic_results"]]
+    if any(result["status"] == "failed" for result in all_automatic_results):
+        automatic_status = (
+            "known_failure" if case.get("automatic_policy") == "known_failure" else "failed"
+        )
+    elif all_automatic_results:
+        automatic_status = "passed"
+    else:
+        automatic_status = "not_configured"
 
     return (
         {
@@ -166,6 +226,11 @@ def inspect_case(case: dict[str, Any]) -> tuple[dict[str, Any], int]:
             "clips": case.get("clips", []),
             "acceptance_checks": case.get("acceptance_checks", []),
             "human_review": case.get("human_review", {}),
+            "review_points": case.get("review_points", []),
+            "known_risks": case.get("known_risks", []),
+            "automatic_checks": automatic_checks,
+            "automatic_policy": case.get("automatic_policy", "block_on_regression"),
+            "automatic_status": automatic_status,
             "notes": case.get("notes", ""),
             "media": media_info,
             "lyrics": lyrics_info,
@@ -270,6 +335,7 @@ def calculate_metrics(blocks: list[SubtitleBlock]) -> SubtitleMetrics:
     max_duration = 0
     max_units = 0
     max_lines = 0
+    single_line_cues = 0
     label_candidates: list[str] = []
     for block in blocks:
         # One millisecond can be introduced by float-to-SRT rounding and has no
@@ -283,6 +349,8 @@ def calculate_metrics(blocks: list[SubtitleBlock]) -> SubtitleMetrics:
         max_duration = max(max_duration, block.end_ms - block.start_ms)
         max_units = max(max_units, *(_display_units(line) for line in block.text_lines))
         max_lines = max(max_lines, len(block.text_lines))
+        if len(block.text_lines) == 1:
+            single_line_cues += 1
         label_candidates.extend(_speaker_candidates(block.text_lines))
 
     counts = Counter(label_candidates)
@@ -296,14 +364,123 @@ def calculate_metrics(blocks: list[SubtitleBlock]) -> SubtitleMetrics:
         max_duration_seconds=round(max_duration / 1000, 3),
         max_text_units=max_units,
         max_lines_per_cue=max_lines,
+        single_line_cues=single_line_cues,
         suspected_speaker_labels=suspicious,
     )
 
 
-def compare_timelines(source_path: Path, translated_path: Path) -> dict[str, Any]:
+def evaluate_reference(
+    checks: dict[str, Any],
+    source_info: dict[str, Any] | None,
+    translated_info: dict[str, Any] | None,
+    comparison: dict[str, Any] | None,
+    source_path: Path | None,
+    translated_path: Path | None,
+) -> list[dict[str, Any]]:
+    if not isinstance(checks, dict) or not checks:
+        return []
+
+    results: list[dict[str, Any]] = []
+    for scope, info in (("source", source_info), ("translated", translated_info)):
+        rules = checks.get(scope, {})
+        if not isinstance(rules, dict) or not rules:
+            continue
+        metrics = (info or {}).get("metrics")
+        exists = bool((info or {}).get("file", {}).get("exists"))
+        if rules.get("required"):
+            _add_check(results, f"{scope}.required", exists, exists, True)
+        if not metrics:
+            continue
+        threshold_map = {
+            "min_cue_count": ("cue_count", "min"),
+            "max_cue_count": ("cue_count", "max"),
+            "max_overlaps": ("overlaps", "max"),
+            "max_non_monotonic": ("non_monotonic", "max"),
+            "max_duration_seconds": ("max_duration_seconds", "max"),
+            "max_text_units": ("max_text_units", "max"),
+            "max_lines_per_cue": ("max_lines_per_cue", "max"),
+            "max_single_line_cues": ("single_line_cues", "max"),
+            "max_suspected_speaker_labels": ("suspected_speaker_labels", "count_max"),
+        }
+        for rule_name, (metric_name, comparison_kind) in threshold_map.items():
+            if rule_name not in rules:
+                continue
+            actual: Any = metrics.get(metric_name, 0)
+            if comparison_kind == "count_max":
+                actual = sum(int(value) for value in (actual or {}).values())
+            expected = rules[rule_name]
+            passed = actual >= expected if comparison_kind == "min" else actual <= expected
+            _add_check(results, f"{scope}.{rule_name}", passed, actual, expected)
+
+    timeline_rules = checks.get("timeline", {})
+    if isinstance(timeline_rules, dict) and timeline_rules:
+        if timeline_rules.get("required"):
+            _add_check(results, "timeline.required", comparison is not None, comparison is not None, True)
+        if comparison:
+            if "min_positional_match_ratio" in timeline_rules:
+                expected = timeline_rules["min_positional_match_ratio"]
+                actual = comparison["positional_match_ratio"]
+                _add_check(results, "timeline.min_positional_match_ratio", actual >= expected, actual, expected)
+            if "max_absolute_cue_delta" in timeline_rules:
+                expected = timeline_rules["max_absolute_cue_delta"]
+                actual = abs(int(comparison["cue_delta"]))
+                _add_check(results, "timeline.max_absolute_cue_delta", actual <= expected, actual, expected)
+            if "expected_cue_delta" in timeline_rules:
+                expected = timeline_rules["expected_cue_delta"]
+                actual = int(comparison["cue_delta"])
+                _add_check(results, "timeline.expected_cue_delta", actual == expected, actual, expected)
+            if "max_missing_source_timelines" in timeline_rules:
+                expected = timeline_rules["max_missing_source_timelines"]
+                actual = int(comparison["missing_source_timelines"])
+                _add_check(results, "timeline.max_missing_source_timelines", actual <= expected, actual, expected)
+            if "max_added_timelines" in timeline_rules:
+                expected = timeline_rules["max_added_timelines"]
+                actual = int(comparison["added_timelines"])
+                _add_check(results, "timeline.max_added_timelines", actual <= expected, actual, expected)
+
+    forbidden = checks.get("forbidden_text", {})
+    if isinstance(forbidden, dict):
+        for scope, path in (("source", source_path), ("translated", translated_path)):
+            phrases = forbidden.get(scope, [])
+            if not phrases or not path or not path.is_file():
+                continue
+            content = path.read_text(encoding="utf-8-sig", errors="ignore")
+            for phrase in phrases:
+                text = str(phrase)
+                _add_check(results, f"{scope}.forbidden_text:{text}", text not in content, text in content, False)
+    return results
+
+
+def _add_check(
+    results: list[dict[str, Any]],
+    name: str,
+    passed: bool,
+    actual: Any,
+    expected: Any,
+) -> None:
+    results.append(
+        {
+            "name": name,
+            "status": "passed" if passed else "failed",
+            "actual": actual,
+            "expected": expected,
+        }
+    )
+
+
+def compare_timelines(
+    source_path: Path,
+    translated_path: Path,
+    *,
+    source_time_offset_seconds: float = 0.0,
+) -> dict[str, Any]:
     source = parse_srt(source_path.read_text(encoding="utf-8-sig", errors="ignore"))
     translated = parse_srt(translated_path.read_text(encoding="utf-8-sig", errors="ignore"))
-    source_times = [block.time_line for block in source]
+    offset_ms = int(round(source_time_offset_seconds * 1000))
+    source_times = [
+        f"{_format_ms(block.start_ms + offset_ms)} --> {_format_ms(block.end_ms + offset_ms)}"
+        for block in source
+    ]
     translated_times = [block.time_line for block in translated]
     positional_matches = sum(left == right for left, right in zip(source_times, translated_times))
     source_set = set(source_times)
@@ -317,6 +494,7 @@ def compare_timelines(source_path: Path, translated_path: Path) -> dict[str, Any
         "positional_match_ratio": round(positional_matches / denominator, 4),
         "missing_source_timelines": len(source_set - translated_set),
         "added_timelines": len(translated_set - source_set),
+        "source_time_offset_seconds": source_time_offset_seconds,
     }
 
 
@@ -347,6 +525,9 @@ def _validate_manifest(data: dict[str, Any]) -> None:
         if case_id in ids:
             raise ValueError(f"Duplicate case id: {case_id}")
         ids.add(case_id)
+        policy = str(case.get("automatic_policy", "block_on_regression"))
+        if policy not in {"block_on_regression", "known_failure"}:
+            raise ValueError(f"Case {case_id} has unsupported automatic_policy: {policy}")
         if not str(case.get("media_path", "")).strip():
             raise ValueError(f"Case {case_id} needs media_path.")
         checks = case.get("acceptance_checks", [])
@@ -415,6 +596,13 @@ def _render_markdown(report: dict[str, Any]) -> str:
         "",
         "> 这是客观证据报告，不会自动判定翻译和打轴质量。只有人工确认稿才能作为质量基准。",
         "",
+        "## 自动检查总览",
+        "",
+        f"- 通过：{report['automatic_summary']['passed']}",
+        f"- 失败：{report['automatic_summary']['failed']}",
+        f"- 已知待刷新：{report['automatic_summary']['known_failure']}",
+        f"- 未配置：{report['automatic_summary']['not_configured']}",
+        "",
     ]
     for case in report["cases"]:
         media = case["media"]
@@ -427,6 +615,7 @@ def _render_markdown(report: dict[str, Any]) -> str:
                 f"- 标签：{', '.join(case['tags']) or '-'}",
                 f"- 素材：`{media['path']}`（{'已找到' if media['exists'] else '缺失'}）",
                 f"- 设置：`{json.dumps(case['settings'], ensure_ascii=False, sort_keys=True)}`",
+                f"- 客观自动检查：`{case['automatic_status']}`",
             ]
         )
         probe = media.get("probe") or {}
@@ -446,6 +635,10 @@ def _render_markdown(report: dict[str, Any]) -> str:
             lines.append("- 测试片段：尚未选择")
         if case["acceptance_checks"]:
             lines.append("- 人工验收重点：" + "；".join(case["acceptance_checks"]))
+        if case["review_points"]:
+            lines.append("- 指定复听点：" + "；".join(case["review_points"]))
+        if case["known_risks"]:
+            lines.append("- 已知限制：" + "；".join(case["known_risks"]))
         review = case["human_review"]
         if review:
             lines.append(
@@ -462,12 +655,25 @@ def _render_markdown(report: dict[str, Any]) -> str:
                 lines.append(f"- 输出指标：{_format_subtitle_metrics(translated_metrics)}")
             comparison = reference.get("timeline_comparison")
             if comparison:
+                offset = float(reference.get("source_time_offset_seconds") or 0.0)
+                if offset:
+                    lines.append(f"- 原文时间偏移：`+{offset:.3f}` 秒（局部轴映射回原视频）")
                 lines.append(
                     "- 时间轴："
                     f"{comparison['source_cues']} -> {comparison['translated_cues']} 条；"
                     f"同位置一致 {comparison['positional_match_ratio']:.1%}；"
                     f"缺少 {comparison['missing_source_timelines']}，新增 {comparison['added_timelines']}"
                 )
+            automatic_results = reference.get("automatic_results") or []
+            if automatic_results:
+                failed = [result for result in automatic_results if result["status"] == "failed"]
+                lines.append(
+                    f"- 本参考自动检查：{len(automatic_results) - len(failed)}/{len(automatic_results)} 通过"
+                )
+                for result in failed:
+                    lines.append(
+                        f"- 自动回归失败：`{result['name']}`，实际 `{result['actual']}`，预期 `{result['expected']}`"
+                    )
             translated = reference.get("translated")
             if translated and translated.get("metrics"):
                 labels = translated["metrics"]["suspected_speaker_labels"]
@@ -492,6 +698,7 @@ def _format_subtitle_metrics(metrics: dict[str, Any]) -> str:
         f"最长 {float(metrics.get('max_duration_seconds') or 0):.2f} 秒，"
         f"最长单行 {int(metrics.get('max_text_units') or 0)} 显示单位，"
         f"每条最多 {int(metrics.get('max_lines_per_cue') or 0)} 行，"
+        f"单行条目 {int(metrics.get('single_line_cues') or 0)}，"
         f"重叠 {int(metrics.get('overlaps') or 0)}"
     )
 

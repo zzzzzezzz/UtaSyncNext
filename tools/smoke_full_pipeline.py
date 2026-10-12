@@ -16,6 +16,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from engine.model_registry import find_complete_snapshot, next_models_root  # noqa: E402
+from engine.cache_env import task_base_name  # noqa: E402
 from engine.pipeline_worker import run_pipeline_worker  # noqa: E402
 from engine.protocol import MSG_DONE, MSG_ERROR, MSG_LOG, MSG_PROGRESS, MSG_STATUS  # noqa: E402
 
@@ -52,6 +53,7 @@ def main() -> int:
         return 1
 
     lyrics_text = ""
+    lyrics_source = ""
     lyrics_path: Path | None = None
     if args.lyrics_file:
         lyrics_path = Path(args.lyrics_file).resolve()
@@ -59,6 +61,7 @@ def main() -> int:
             print(f"FAIL: lyrics file not found: {lyrics_path}")
             return 1
         lyrics_text = lyrics_path.read_text(encoding="utf-8-sig", errors="ignore").strip()
+        lyrics_source = str(lyrics_path)
 
     audio_type = {
         "speech": "访谈 / 播客",
@@ -67,12 +70,18 @@ def main() -> int:
     }[args.mode]
     demucs_setting = "开启 Demucs 人声分离 (高质量/很慢)" if args.demucs else "先跳过 Demucs (极速/推荐先出轴)"
     ass_preset = "默认双语 (纯白+浅灰)" if args.ass else "不生成 (仅SRT)"
+    base_settings: dict[str, object] = {}
     api_settings = {"api_key": "", "api_url": "", "api_model": "", "proxy_url": ""}
     output_mode = "纯中文字幕"
     if args.use_settings_api:
         from utils.config import load_settings
 
         settings = load_settings()
+        base_settings = dict(settings)
+        if not lyrics_text:
+            lyrics_text = str(settings.get("cached_lyrics") or "")
+            if lyrics_text:
+                lyrics_source = "user_settings.json cached_lyrics"
         api_settings = {
             "api_key": str(settings.get("api_key") or "").strip(),
             "api_url": str(settings.get("api_url") or "").strip(),
@@ -85,14 +94,17 @@ def main() -> int:
             print("FAIL: --use-settings-api was requested but user_settings.json has no api_key.")
             return 1
         output_mode = "中日双语字幕" if args.translation_mode == "bilingual" else "纯中文字幕"
+        if args.ass:
+            ass_preset = str(settings.get("ass_preset") or ass_preset)
 
     payload = {
         "media_path": str(media_path),
         "lyrics": lyrics_text,
         "settings": {
+            **base_settings,
             "audio_type": audio_type,
             "model_size": args.model,
-            "hardware_mode": "极限防爆",
+            "hardware_mode": base_settings.get("hardware_mode", "自动匹配显存 (推荐)"),
             "use_demucs": demucs_setting,
             "output_mode": output_mode,
             "ass_preset": ass_preset,
@@ -113,7 +125,8 @@ def main() -> int:
         print("FAIL: worker did not emit done message.")
         return 1
 
-    expected_srt = NEXT_ROOT / "output" / media_path.stem / "subtitles" / f"{media_path.stem}_极致打轴.srt"
+    task_name = task_base_name(media_path)
+    expected_srt = NEXT_ROOT / "output" / task_name / "subtitles" / f"{task_name}_极致打轴.srt"
     if not _is_valid_srt(expected_srt):
         print(f"FAIL: expected SRT is missing or empty: {expected_srt}")
         return 1
@@ -142,8 +155,8 @@ def main() -> int:
 
     print("PASS")
     print(f"- media: {media_path}")
-    if lyrics_path:
-        print(f"- lyrics: {lyrics_path}")
+    if lyrics_source:
+        print(f"- lyrics: {lyrics_source}")
     print(f"- model: {model_snapshot}")
     print(f"- srt: {artifact_srt}")
     if artifact_ass:

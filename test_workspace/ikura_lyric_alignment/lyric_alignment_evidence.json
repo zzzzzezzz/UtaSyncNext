@@ -1,0 +1,1254 @@
+{
+  "schema_version": 1,
+  "purpose": "research_only_lyric_assisted_alignment",
+  "production_subtitle_changed": false,
+  "media": "F:\\live人声分离实验\\ikura.mp4",
+  "vocal": "E:\\traecode\\UtaSync\\output\\ikura\\audio\\ikura_纯净人声.wav",
+  "lyrics": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_assets\\lyrics_refs\\ikura_dingo_killing_voice_5songs.txt",
+  "window": {
+    "start": 0.0,
+    "end": 45.0
+  },
+  "expected_lines": [
+    "ゆらゆらり はらはらり",
+    "色とりどり 乱れ咲き",
+    "花の街思い出す この空から"
+  ],
+  "model": "E:\\traecode\\UtaSync\\UtaSyncNext\\models_faster\\models--Systran--faster-whisper-large-v2\\snapshots\\f0fe81560cb8b68660e564f55dd99207059c092e",
+  "elapsed_seconds": 562.19,
+  "best_probe": "vocal_lyrics",
+  "preview_written": true,
+  "preview_path": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\ikura_lyric_alignment\\lyric_alignment_preview.srt",
+  "probes": [
+    {
+      "label": "source_generic",
+      "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\ikura_lyric_alignment\\source_window.wav",
+      "prompt_contains_expected_lyrics": false,
+      "segment_count": 4,
+      "matched_line_count": 0,
+      "average_match_score": 0.231,
+      "matches": [
+        {
+          "expected": "ゆらゆらり はらはらり",
+          "detected": "空からひょんな出来事から",
+          "score": 0.1818,
+          "start": null,
+          "end": null,
+          "accepted": false
+        },
+        {
+          "expected": "色とりどり 乱れ咲き",
+          "detected": "やってきたこの場所",
+          "score": 0.1111,
+          "start": null,
+          "end": null,
+          "accepted": false
+        },
+        {
+          "expected": "花の街思い出す この空から",
+          "detected": "空から",
+          "score": 0.4,
+          "start": null,
+          "end": null,
+          "accepted": false
+        }
+      ],
+      "segments": [
+        {
+          "start": 27.18,
+          "end": 29.98,
+          "text": "この曲は、日本の歌手の中で最も有名な曲です。",
+          "avg_logprob": -0.7738,
+          "no_speech_prob": 0.8545,
+          "words": [
+            {
+              "start": 27.18,
+              "end": 28.58,
+              "word": "この",
+              "probability": 0.0036
+            },
+            {
+              "start": 28.58,
+              "end": 29.98,
+              "word": "曲",
+              "probability": 0.2406
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "は、",
+              "probability": 0.6318
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "日本",
+              "probability": 0.0268
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "の",
+              "probability": 0.3728
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "歌",
+              "probability": 0.0226
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "手",
+              "probability": 0.1765
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "の",
+              "probability": 0.3262
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "中",
+              "probability": 0.026
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "で",
+              "probability": 0.4487
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "最",
+              "probability": 0.186
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "も",
+              "probability": 0.9312
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "有",
+              "probability": 0.3979
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "名",
+              "probability": 0.9976
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "な",
+              "probability": 0.9482
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "曲",
+              "probability": 0.4658
+            },
+            {
+              "start": 29.98,
+              "end": 29.98,
+              "word": "です。",
+              "probability": 0.447
+            }
+          ]
+        },
+        {
+          "start": 29.98,
+          "end": 32.2,
+          "text": "空から",
+          "avg_logprob": -0.4922,
+          "no_speech_prob": 0.178,
+          "words": [
+            {
+              "start": 29.98,
+              "end": 31.2,
+              "word": "空",
+              "probability": 0.6958
+            },
+            {
+              "start": 31.2,
+              "end": 32.2,
+              "word": "から",
+              "probability": 0.9893
+            }
+          ]
+        },
+        {
+          "start": 38.2,
+          "end": 42.26,
+          "text": "ひょんな出来事から",
+          "avg_logprob": -0.4922,
+          "no_speech_prob": 0.178,
+          "words": [
+            {
+              "start": 38.2,
+              "end": 39.2,
+              "word": "ひ",
+              "probability": 0.4182
+            },
+            {
+              "start": 39.2,
+              "end": 40.2,
+              "word": "ょ",
+              "probability": 0.9927
+            },
+            {
+              "start": 40.2,
+              "end": 40.7,
+              "word": "んな",
+              "probability": 0.9712
+            },
+            {
+              "start": 40.7,
+              "end": 41.2,
+              "word": "出来",
+              "probability": 0.9302
+            },
+            {
+              "start": 41.2,
+              "end": 41.62,
+              "word": "事",
+              "probability": 0.9961
+            },
+            {
+              "start": 41.62,
+              "end": 42.26,
+              "word": "から",
+              "probability": 0.9805
+            }
+          ]
+        },
+        {
+          "start": 42.78,
+          "end": 44.74,
+          "text": "やってきたこの場所",
+          "avg_logprob": -0.4922,
+          "no_speech_prob": 0.178,
+          "words": [
+            {
+              "start": 42.78,
+              "end": 43.36,
+              "word": "やって",
+              "probability": 0.7192
+            },
+            {
+              "start": 43.36,
+              "end": 43.8,
+              "word": "きた",
+              "probability": 0.7012
+            },
+            {
+              "start": 43.8,
+              "end": 44.24,
+              "word": "この",
+              "probability": 0.8359
+            },
+            {
+              "start": 44.24,
+              "end": 44.52,
+              "word": "場",
+              "probability": 0.9819
+            },
+            {
+              "start": 44.52,
+              "end": 44.74,
+              "word": "所",
+              "probability": 0.9995
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "source_lyrics",
+      "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\ikura_lyric_alignment\\source_window.wav",
+      "prompt_contains_expected_lyrics": true,
+      "segment_count": 4,
+      "matched_line_count": 2,
+      "average_match_score": 0.5879,
+      "matches": [
+        {
+          "expected": "ゆらゆらり はらはらり",
+          "detected": "?ゆらゆらり はらはらり 色とりどり 乱れ咲き",
+          "score": 0.6897,
+          "start": 20.34,
+          "end": 26.54,
+          "accepted": true
+        },
+        {
+          "expected": "色とりどり 乱れ咲き",
+          "detected": "ひょんな出来事からやってきたこの場所",
+          "score": 0.0741,
+          "start": null,
+          "end": null,
+          "accepted": false
+        },
+        {
+          "expected": "花の街思い出す この空から",
+          "detected": "花の街思い出すこの空から",
+          "score": 1.0,
+          "start": 26.54,
+          "end": 32.22,
+          "accepted": true
+        }
+      ],
+      "segments": [
+        {
+          "start": 14.6,
+          "end": 19.72,
+          "text": "この空を 見ぬふりを要求して 眠ってたのに",
+          "avg_logprob": -1.5637,
+          "no_speech_prob": 0.5127,
+          "words": [
+            {
+              "start": 14.6,
+              "end": 15.16,
+              "word": "この",
+              "probability": 0.0036
+            },
+            {
+              "start": 15.16,
+              "end": 15.16,
+              "word": "空",
+              "probability": 0.0014
+            },
+            {
+              "start": 15.16,
+              "end": 15.16,
+              "word": "を",
+              "probability": 0.1191
+            },
+            {
+              "start": 15.16,
+              "end": 15.16,
+              "word": "見",
+              "probability": 0.0442
+            },
+            {
+              "start": 15.16,
+              "end": 15.16,
+              "word": "ぬ",
+              "probability": 0.3525
+            },
+            {
+              "start": 15.16,
+              "end": 15.16,
+              "word": "ふ",
+              "probability": 0.0055
+            },
+            {
+              "start": 15.16,
+              "end": 15.16,
+              "word": "り",
+              "probability": 0.8911
+            },
+            {
+              "start": 15.16,
+              "end": 15.16,
+              "word": "を",
+              "probability": 0.1874
+            },
+            {
+              "start": 15.16,
+              "end": 15.16,
+              "word": "要",
+              "probability": 0.0001
+            },
+            {
+              "start": 15.16,
+              "end": 15.88,
+              "word": "求",
+              "probability": 0.1044
+            },
+            {
+              "start": 15.88,
+              "end": 15.88,
+              "word": "して",
+              "probability": 0.2622
+            },
+            {
+              "start": 15.88,
+              "end": 15.94,
+              "word": "眠",
+              "probability": 0.2593
+            },
+            {
+              "start": 15.94,
+              "end": 18.92,
+              "word": "って",
+              "probability": 0.1971
+            },
+            {
+              "start": 18.92,
+              "end": 19.38,
+              "word": "た",
+              "probability": 0.0352
+            },
+            {
+              "start": 19.38,
+              "end": 19.72,
+              "word": "の",
+              "probability": 0.1161
+            },
+            {
+              "start": 19.72,
+              "end": 19.72,
+              "word": "に?",
+              "probability": 0.1782
+            }
+          ]
+        },
+        {
+          "start": 20.34,
+          "end": 26.54,
+          "text": "?ゆらゆらり はらはらり 色とりどり 乱れ咲き",
+          "avg_logprob": -1.5637,
+          "no_speech_prob": 0.5127,
+          "words": [
+            {
+              "start": 20.34,
+              "end": 20.34,
+              "word": "ゆ",
+              "probability": 0.0025
+            },
+            {
+              "start": 20.34,
+              "end": 21.1,
+              "word": "ら",
+              "probability": 0.9336
+            },
+            {
+              "start": 21.1,
+              "end": 21.28,
+              "word": "ゆ",
+              "probability": 0.958
+            },
+            {
+              "start": 21.28,
+              "end": 21.5,
+              "word": "ら",
+              "probability": 0.998
+            },
+            {
+              "start": 21.5,
+              "end": 21.78,
+              "word": "り",
+              "probability": 0.9849
+            },
+            {
+              "start": 21.78,
+              "end": 22.02,
+              "word": "は",
+              "probability": 0.3118
+            },
+            {
+              "start": 22.02,
+              "end": 22.3,
+              "word": "ら",
+              "probability": 0.9966
+            },
+            {
+              "start": 22.3,
+              "end": 22.44,
+              "word": "は",
+              "probability": 0.9971
+            },
+            {
+              "start": 22.44,
+              "end": 22.64,
+              "word": "ら",
+              "probability": 0.9976
+            },
+            {
+              "start": 22.64,
+              "end": 23.12,
+              "word": "り",
+              "probability": 0.999
+            },
+            {
+              "start": 23.86,
+              "end": 23.98,
+              "word": "色",
+              "probability": 0.8364
+            },
+            {
+              "start": 23.98,
+              "end": 24.3,
+              "word": "と",
+              "probability": 0.9761
+            },
+            {
+              "start": 24.3,
+              "end": 24.56,
+              "word": "り",
+              "probability": 0.998
+            },
+            {
+              "start": 24.56,
+              "end": 24.7,
+              "word": "ど",
+              "probability": 0.9985
+            },
+            {
+              "start": 24.7,
+              "end": 25.0,
+              "word": "り",
+              "probability": 0.9995
+            },
+            {
+              "start": 25.2,
+              "end": 25.4,
+              "word": "乱",
+              "probability": 0.9951
+            },
+            {
+              "start": 25.4,
+              "end": 25.68,
+              "word": "れ",
+              "probability": 0.9946
+            },
+            {
+              "start": 25.68,
+              "end": 25.92,
+              "word": "咲",
+              "probability": 0.9646
+            },
+            {
+              "start": 25.92,
+              "end": 26.54,
+              "word": "き",
+              "probability": 0.9849
+            }
+          ]
+        },
+        {
+          "start": 26.54,
+          "end": 32.22,
+          "text": "花の街思い出すこの空から",
+          "avg_logprob": -0.4204,
+          "no_speech_prob": 0.0071,
+          "words": [
+            {
+              "start": 26.54,
+              "end": 27.42,
+              "word": "花",
+              "probability": 0.8604
+            },
+            {
+              "start": 27.42,
+              "end": 27.7,
+              "word": "の",
+              "probability": 0.9897
+            },
+            {
+              "start": 27.7,
+              "end": 28.04,
+              "word": "街",
+              "probability": 0.8877
+            },
+            {
+              "start": 28.04,
+              "end": 28.6,
+              "word": "思",
+              "probability": 0.5708
+            },
+            {
+              "start": 28.6,
+              "end": 28.94,
+              "word": "い",
+              "probability": 0.9995
+            },
+            {
+              "start": 28.94,
+              "end": 29.08,
+              "word": "出",
+              "probability": 0.9912
+            },
+            {
+              "start": 29.08,
+              "end": 29.32,
+              "word": "す",
+              "probability": 0.999
+            },
+            {
+              "start": 29.32,
+              "end": 29.86,
+              "word": "この",
+              "probability": 0.5269
+            },
+            {
+              "start": 29.86,
+              "end": 31.22,
+              "word": "空",
+              "probability": 0.9761
+            },
+            {
+              "start": 31.22,
+              "end": 32.22,
+              "word": "から",
+              "probability": 0.9956
+            }
+          ]
+        },
+        {
+          "start": 39.1,
+          "end": 44.74,
+          "text": "ひょんな出来事からやってきたこの場所",
+          "avg_logprob": -0.4204,
+          "no_speech_prob": 0.0071,
+          "words": [
+            {
+              "start": 39.1,
+              "end": 40.02,
+              "word": "ひ",
+              "probability": 0.2418
+            },
+            {
+              "start": 40.02,
+              "end": 40.2,
+              "word": "ょ",
+              "probability": 0.9927
+            },
+            {
+              "start": 40.2,
+              "end": 40.74,
+              "word": "んな",
+              "probability": 0.9692
+            },
+            {
+              "start": 40.74,
+              "end": 41.2,
+              "word": "出来",
+              "probability": 0.9375
+            },
+            {
+              "start": 41.2,
+              "end": 41.62,
+              "word": "事",
+              "probability": 0.9946
+            },
+            {
+              "start": 41.62,
+              "end": 42.28,
+              "word": "から",
+              "probability": 0.9448
+            },
+            {
+              "start": 42.28,
+              "end": 43.36,
+              "word": "やって",
+              "probability": 0.7144
+            },
+            {
+              "start": 43.36,
+              "end": 43.78,
+              "word": "きた",
+              "probability": 0.6943
+            },
+            {
+              "start": 43.78,
+              "end": 44.24,
+              "word": "この",
+              "probability": 0.9624
+            },
+            {
+              "start": 44.24,
+              "end": 44.52,
+              "word": "場",
+              "probability": 0.9858
+            },
+            {
+              "start": 44.52,
+              "end": 44.74,
+              "word": "所",
+              "probability": 0.9995
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "vocal_generic",
+      "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\ikura_lyric_alignment\\vocal_window.wav",
+      "prompt_contains_expected_lyrics": false,
+      "segment_count": 1,
+      "matched_line_count": 0,
+      "average_match_score": 0.0672,
+      "matches": [
+        {
+          "expected": "ゆらゆらり はらはらり",
+          "detected": "この歌詞の歌詞は、日本語の歌詞と日本語の歌詞を使用しています。",
+          "score": 0.0513,
+          "start": null,
+          "end": null,
+          "accepted": false
+        },
+        {
+          "expected": "色とりどり 乱れ咲き",
+          "detected": "この歌詞の歌詞は、日本語の歌詞と日本語の歌詞を使用しています。",
+          "score": 0.0526,
+          "start": null,
+          "end": null,
+          "accepted": false
+        },
+        {
+          "expected": "花の街思い出す この空から",
+          "detected": "この歌詞の歌詞は、日本語の歌詞と日本語の歌詞を使用しています。",
+          "score": 0.0976,
+          "start": null,
+          "end": null,
+          "accepted": false
+        }
+      ],
+      "segments": [
+        {
+          "start": 41.84,
+          "end": 44.98,
+          "text": "この歌詞の歌詞は、日本語の歌詞と日本語の歌詞を使用しています。",
+          "avg_logprob": -0.938,
+          "no_speech_prob": 0.5146,
+          "words": [
+            {
+              "start": 41.84,
+              "end": 43.24,
+              "word": "この",
+              "probability": 0.0085
+            },
+            {
+              "start": 43.24,
+              "end": 44.64,
+              "word": "歌",
+              "probability": 0.0044
+            },
+            {
+              "start": 44.64,
+              "end": 44.64,
+              "word": "詞",
+              "probability": 0.5583
+            },
+            {
+              "start": 44.64,
+              "end": 44.98,
+              "word": "の",
+              "probability": 0.1198
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "歌",
+              "probability": 0.1901
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "詞",
+              "probability": 0.9253
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "は、",
+              "probability": 0.2715
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "日本",
+              "probability": 0.0539
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "語",
+              "probability": 0.4424
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "の",
+              "probability": 0.1743
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "歌",
+              "probability": 0.4822
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "詞",
+              "probability": 0.9827
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "と",
+              "probability": 0.1945
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "日本",
+              "probability": 0.3286
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "語",
+              "probability": 0.8921
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "の",
+              "probability": 0.9194
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "歌",
+              "probability": 0.9136
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "詞",
+              "probability": 0.9988
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "を",
+              "probability": 0.1361
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "使",
+              "probability": 0.1915
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "用",
+              "probability": 0.7227
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "して",
+              "probability": 0.6333
+            },
+            {
+              "start": 44.98,
+              "end": 44.98,
+              "word": "います。",
+              "probability": 0.6489
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "vocal_lyrics",
+      "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\ikura_lyric_alignment\\vocal_window.wav",
+      "prompt_contains_expected_lyrics": true,
+      "segment_count": 5,
+      "matched_line_count": 3,
+      "average_match_score": 1.0,
+      "matches": [
+        {
+          "expected": "ゆらゆらり はらはらり",
+          "detected": "ゆらゆらり はらはらり",
+          "score": 1.0,
+          "start": 19.66,
+          "end": 23.06,
+          "accepted": true
+        },
+        {
+          "expected": "色とりどり 乱れ咲き",
+          "detected": "色とりどり 乱れ咲き",
+          "score": 1.0,
+          "start": 23.06,
+          "end": 26.42,
+          "accepted": true
+        },
+        {
+          "expected": "花の街思い出す この空から",
+          "detected": "花の街思い出すこの空から",
+          "score": 1.0,
+          "start": 26.42,
+          "end": 32.3,
+          "accepted": true
+        }
+      ],
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 19.66,
+          "text": "gett Clintonville この空を下りたい",
+          "avg_logprob": -1.8986,
+          "no_speech_prob": 0.4241,
+          "words": [
+            {
+              "start": 0.0,
+              "end": 0.38,
+              "word": "get",
+              "probability": 0.0
+            },
+            {
+              "start": 0.38,
+              "end": 2.28,
+              "word": "t",
+              "probability": 0.0119
+            },
+            {
+              "start": 2.28,
+              "end": 2.28,
+              "word": "Clinton",
+              "probability": 0.0
+            },
+            {
+              "start": 2.28,
+              "end": 2.28,
+              "word": "ville",
+              "probability": 0.0
+            },
+            {
+              "start": 2.28,
+              "end": 19.6,
+              "word": "この",
+              "probability": 0.0044
+            },
+            {
+              "start": 19.6,
+              "end": 19.6,
+              "word": "空",
+              "probability": 0.0018
+            },
+            {
+              "start": 19.6,
+              "end": 19.6,
+              "word": "を",
+              "probability": 0.2306
+            },
+            {
+              "start": 19.6,
+              "end": 19.6,
+              "word": "下",
+              "probability": 0.0009
+            },
+            {
+              "start": 19.6,
+              "end": 19.66,
+              "word": "り",
+              "probability": 0.0989
+            },
+            {
+              "start": 19.66,
+              "end": 19.66,
+              "word": "たい",
+              "probability": 0.0329
+            }
+          ]
+        },
+        {
+          "start": 19.66,
+          "end": 23.06,
+          "text": "ゆらゆらり はらはらり",
+          "avg_logprob": -1.8986,
+          "no_speech_prob": 0.4241,
+          "words": [
+            {
+              "start": 19.66,
+              "end": 19.68,
+              "word": "ゆ",
+              "probability": 0.0005
+            },
+            {
+              "start": 19.68,
+              "end": 21.1,
+              "word": "ら",
+              "probability": 0.9287
+            },
+            {
+              "start": 21.1,
+              "end": 21.32,
+              "word": "ゆ",
+              "probability": 0.9688
+            },
+            {
+              "start": 21.32,
+              "end": 21.5,
+              "word": "ら",
+              "probability": 0.9868
+            },
+            {
+              "start": 21.5,
+              "end": 21.8,
+              "word": "り",
+              "probability": 0.77
+            },
+            {
+              "start": 21.8,
+              "end": 22.14,
+              "word": "は",
+              "probability": 0.0387
+            },
+            {
+              "start": 22.14,
+              "end": 22.3,
+              "word": "ら",
+              "probability": 0.9517
+            },
+            {
+              "start": 22.3,
+              "end": 22.52,
+              "word": "は",
+              "probability": 0.9927
+            },
+            {
+              "start": 22.52,
+              "end": 22.64,
+              "word": "ら",
+              "probability": 0.9888
+            },
+            {
+              "start": 22.64,
+              "end": 23.06,
+              "word": "り",
+              "probability": 0.9746
+            }
+          ]
+        },
+        {
+          "start": 23.06,
+          "end": 26.42,
+          "text": "色とりどり 乱れ咲き",
+          "avg_logprob": -1.8986,
+          "no_speech_prob": 0.4241,
+          "words": [
+            {
+              "start": 23.06,
+              "end": 23.98,
+              "word": "色",
+              "probability": 0.2559
+            },
+            {
+              "start": 23.98,
+              "end": 24.34,
+              "word": "と",
+              "probability": 0.9438
+            },
+            {
+              "start": 24.34,
+              "end": 24.56,
+              "word": "り",
+              "probability": 0.9829
+            },
+            {
+              "start": 24.56,
+              "end": 24.72,
+              "word": "ど",
+              "probability": 0.9956
+            },
+            {
+              "start": 24.72,
+              "end": 24.96,
+              "word": "り",
+              "probability": 0.9985
+            },
+            {
+              "start": 25.18,
+              "end": 25.4,
+              "word": "乱",
+              "probability": 0.9719
+            },
+            {
+              "start": 25.4,
+              "end": 25.68,
+              "word": "れ",
+              "probability": 0.9927
+            },
+            {
+              "start": 25.68,
+              "end": 25.92,
+              "word": "咲",
+              "probability": 0.9802
+            },
+            {
+              "start": 25.92,
+              "end": 26.42,
+              "word": "き",
+              "probability": 0.9844
+            }
+          ]
+        },
+        {
+          "start": 26.42,
+          "end": 32.3,
+          "text": "花の街思い出すこの空から",
+          "avg_logprob": -0.3805,
+          "no_speech_prob": 0.1473,
+          "words": [
+            {
+              "start": 26.42,
+              "end": 27.42,
+              "word": "花",
+              "probability": 0.4575
+            },
+            {
+              "start": 27.42,
+              "end": 27.68,
+              "word": "の",
+              "probability": 0.957
+            },
+            {
+              "start": 27.68,
+              "end": 28.06,
+              "word": "街",
+              "probability": 0.854
+            },
+            {
+              "start": 28.06,
+              "end": 28.6,
+              "word": "思",
+              "probability": 0.644
+            },
+            {
+              "start": 28.6,
+              "end": 28.94,
+              "word": "い",
+              "probability": 0.9995
+            },
+            {
+              "start": 28.94,
+              "end": 29.08,
+              "word": "出",
+              "probability": 0.9927
+            },
+            {
+              "start": 29.08,
+              "end": 29.34,
+              "word": "す",
+              "probability": 0.9956
+            },
+            {
+              "start": 29.34,
+              "end": 29.84,
+              "word": "この",
+              "probability": 0.7139
+            },
+            {
+              "start": 29.84,
+              "end": 31.22,
+              "word": "空",
+              "probability": 0.978
+            },
+            {
+              "start": 31.22,
+              "end": 32.3,
+              "word": "から",
+              "probability": 0.9795
+            }
+          ]
+        },
+        {
+          "start": 39.66,
+          "end": 44.98,
+          "text": "そんな出来事からやっと来たこの場所は",
+          "avg_logprob": -0.3805,
+          "no_speech_prob": 0.1473,
+          "words": [
+            {
+              "start": 39.66,
+              "end": 40.44,
+              "word": "そんな",
+              "probability": 0.13
+            },
+            {
+              "start": 40.44,
+              "end": 41.22,
+              "word": "出来",
+              "probability": 0.938
+            },
+            {
+              "start": 41.22,
+              "end": 41.62,
+              "word": "事",
+              "probability": 0.999
+            },
+            {
+              "start": 41.62,
+              "end": 42.5,
+              "word": "から",
+              "probability": 0.9873
+            },
+            {
+              "start": 42.5,
+              "end": 43.28,
+              "word": "や",
+              "probability": 0.1074
+            },
+            {
+              "start": 43.28,
+              "end": 43.44,
+              "word": "っと",
+              "probability": 0.9932
+            },
+            {
+              "start": 43.44,
+              "end": 43.66,
+              "word": "来",
+              "probability": 0.8286
+            },
+            {
+              "start": 43.66,
+              "end": 43.84,
+              "word": "た",
+              "probability": 0.999
+            },
+            {
+              "start": 43.84,
+              "end": 44.24,
+              "word": "この",
+              "probability": 0.9346
+            },
+            {
+              "start": 44.24,
+              "end": 44.52,
+              "word": "場",
+              "probability": 0.9863
+            },
+            {
+              "start": 44.52,
+              "end": 44.76,
+              "word": "所",
+              "probability": 0.9995
+            },
+            {
+              "start": 44.76,
+              "end": 44.98,
+              "word": "は",
+              "probability": 0.5112
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

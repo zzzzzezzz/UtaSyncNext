@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "yama-color-opening-positive",
+      "description": "Color opening lyrics missing from the default recognition should be recoverable.",
+      "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\research-color-opening-direct-media-155-210\\audio\\d6c35998_源音频.wav",
+      "lyrics": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_assets\\lyrics_refs\\yama_tiktok_color_aiwotoku.txt",
+      "source_srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_assets\\regression_refs\\yama_color_opening_missing_source.srt",
+      "start": 24.0,
+      "end": 35.0,
+      "expected_lines": [
+        "じっと日々を見逃さないで",
+        "きっと大人はそれらしくするので",
+        "かかりきりになるんだ",
+        "関心はまだ僕ら"
+      ],
+      "expectations": {
+        "minimum_lyrics_matches": 4,
+        "expect_preview_written": true,
+        "expect_full_preview_written": true,
+        "expect_source_unchanged": true
+      }
+    },
+    {
+      "id": "yama-aiwotoku-piano-negative",
+      "description": "A piano-only interlude must not become a complete prompted chorus.",
+      "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\research-aiwotoku-piano-12m30s-13m45s\\audio\\9990ffa1_源音频.wav",
+      "lyrics": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_assets\\lyrics_refs\\yama_tiktok_color_aiwotoku.txt",
+      "start": 0.0,
+      "end": 30.0,
+      "expected_lines": [
+        "手放したっていいさ",
+        "傷を付け合う運命",
+        "ぞんざいな日々は",
+        "手離したっていいさ",
+        "軽薄な言葉も紛れもなく愛だろ"
+      ],
+      "expectations": {
+        "maximum_lyrics_matches": 2,
+        "expect_preview_written": false,
+        "expect_full_preview_written": false,
+        "expect_source_unchanged": true
+      }
+    },
+    {
+      "id": "majiko-kokoronashi-preserve-negative",
+      "description": "Aligned real lyrics must not overwrite overlapping source cues without strict evidence.",
+      "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\心做\\audio\\f8ec283b_源音频.wav",
+      "lyrics": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_assets\\lyrics_refs\\majiko_kokoronashi.txt",
+      "source_srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\心做\\subtitles\\心做_极致打轴.srt",
+      "diagnostics": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\心做\\subtitles\\心做_极致打轴_识别诊断.json",
+      "start": 180.0,
+      "end": 202.0,
+      "expected_lines": [
+        "君にどれだけ愛されても",
+        "僕の心臓は一つだけ",
+        "やめてよ やめてよ"
+      ],
+      "expectations": {
+        "expect_full_preview_written": false,
+        "expect_source_unchanged": true
+      }
+    }
+  ]
+}

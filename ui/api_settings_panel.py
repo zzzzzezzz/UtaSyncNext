@@ -11,6 +11,7 @@ from ui.sidebar_options import (
     TRANSLATION_API_PRESETS,
 )
 from ui.theme import TEXT_HINT, TEXT_TITLE
+from utils.network_proxy import ProxyConfigError, normalize_proxy_url
 
 
 class ApiSettingsPanel(ctk.CTkScrollableFrame):
@@ -71,10 +72,11 @@ class ApiSettingsPanel(ctk.CTkScrollableFrame):
 
         self._divider(row)
         row += 1
+        row = self._add_group("网络代理（翻译 / AI 配色 / 模型下载）", row)
         self.proxy_entry = ctk.CTkEntry(
             self,
             font=ctk.CTkFont(family="Consolas", size=12),
-            placeholder_text="本地代理，如 10808 / 127.0.0.1:10808；留空直连",
+            placeholder_text="例如 10808；留空则直连或使用系统代理",
             height=32,
             fg_color="#121212",
             text_color=TEXT_TITLE,
@@ -83,6 +85,17 @@ class ApiSettingsPanel(ctk.CTkScrollableFrame):
         )
         self.proxy_entry.insert(0, self.settings.get("proxy_url", ""))
         self.proxy_entry.grid(row=row, column=0, padx=20, pady=(15, 10), sticky="ew")
+        self.proxy_entry.bind("<KeyRelease>", self._update_proxy_hint)
+        self.proxy_hint_label = ctk.CTkLabel(
+            self,
+            text="",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+            text_color=TEXT_HINT,
+            wraplength=300,
+            justify="left",
+        )
+        self.proxy_hint_label.grid(row=row + 1, column=0, padx=20, pady=(0, 10), sticky="w")
+        self._update_proxy_hint()
 
     def get_settings(self) -> dict[str, str]:
         preset_design = self.opt_api_preset_design.get()
@@ -105,6 +118,7 @@ class ApiSettingsPanel(ctk.CTkScrollableFrame):
             "api_model_design": model_design,
             "api_key_design": key_design,
             "proxy_url": self.proxy_entry.get().strip(),
+            "model_download_proxy": self.proxy_entry.get().strip(),
         }
 
     def on_api_preset_change(self, choice: str) -> None:
@@ -116,6 +130,21 @@ class ApiSettingsPanel(ctk.CTkScrollableFrame):
 
     def on_design_api_preset_change(self, choice: str) -> None:
         self._sync_design_fields(choice)
+
+    def _update_proxy_hint(self, _event: object | None = None) -> None:
+        value = self.proxy_entry.get().strip()
+        try:
+            normalized = normalize_proxy_url(value)
+        except ProxyConfigError as exc:
+            self.proxy_hint_label.configure(text=f"代理格式有误：{exc}", text_color="#FCA5A5")
+            return
+        if normalized:
+            self.proxy_hint_label.configure(
+                text=f"翻译、AI 配色和模型下载将统一使用：{normalized}",
+                text_color=TEXT_HINT,
+            )
+        else:
+            self.proxy_hint_label.configure(text="留空时使用直连或系统环境代理。", text_color=TEXT_HINT)
 
     def _sync_design_fields(self, choice: str | None = None) -> None:
         selected = choice or self.opt_api_preset_design.get()
@@ -138,7 +167,7 @@ class ApiSettingsPanel(ctk.CTkScrollableFrame):
             self,
             text=text,
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color="#666666",
+            text_color="#A1A1AA",
         ).grid(row=row, column=0, padx=20, pady=(15, 2), sticky="w")
         return row + 1
 

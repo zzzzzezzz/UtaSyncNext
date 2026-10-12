@@ -9,6 +9,7 @@ __pycache__/
 *.spec.bak
 models_faster/
 output/
+fonts/
 test_logs/
 .safety/
 test_workspace/cases.local.json
@@ -18,6 +19,7 @@ test_workspace/runs/
 # Private local configuration. Never commit API keys or personal presets.
 user_settings.json
 user_presets.json
+user_font_pairs.json
 *.local.json
 secrets.*
 .env
@@ -47,3 +49,6 @@ test_assets/lyrics_refs/*.txt
 *.log
 crash_trace.log
 launcher_crash.log
+
+# Local performance history is runtime state, not source.
+performance/

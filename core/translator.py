@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import difflib
 import hashlib
 import inspect
 import json
@@ -12,9 +13,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from core.lyrics_context import parse_lyrics_sections, select_lyrics_context
+from utils.network_proxy import normalize_proxy_url
+
 
 ProgressCallback = Callable[[float, str], None]
-PROMPT_POLICY_VERSION = "next-v10-lyric-overlap-retry"
+PROMPT_POLICY_VERSION = "next-v12-short-tail-guard"
 API_REQUEST_TIMEOUT_SECONDS = 180.0
 SPEAKER_COLON_RE = re.compile(
     r"^(?P<label>[A-Za-z][A-Za-z0-9_. -]{1,24}|[\u3400-\u9fff\u3040-\u30ffー]{2,8})\s*[:：]"
@@ -100,15 +104,19 @@ class SubtitleTranslator:
         self.cache_lock = threading.Lock()
         self.failure_lock = threading.Lock()
         self.api_trace_lock = threading.Lock()
+        self.fatal_error_event = threading.Event()
         self.translation_cache = self._load_cache()
         self.failed_batches = 0
         self.total_batches = 0
         self.cache_hits = 0
         self.api_calls = 0
         self.alignment_fallbacks = 0
+        self.bilingual_coverage_retries = 0
         self.speaker_label_warnings = 0
         self.speaker_labels_removed = 0
         self.lyric_alignment_warnings = 0
+        self.lyric_gap_warnings = 0
+        self.lyric_gap_details: list[dict[str, object]] = []
         self.active_model = self.primary_model
         self.returned_models: set[str] = set()
         self.api_trace: dict[str, object] = {}
@@ -133,10 +141,14 @@ class SubtitleTranslator:
         self.cache_hits = 0
         self.api_calls = 0
         self.alignment_fallbacks = 0
+        self.bilingual_coverage_retries = 0
         self.speaker_label_warnings = 0
         self.speaker_labels_removed = 0
         self.lyric_alignment_warnings = 0
+        self.lyric_gap_warnings = 0
+        self.lyric_gap_details = []
         self.returned_models.clear()
+        self.fatal_error_event.clear()
         print("\n[Next 翻译阶段] 启动独立大模型翻译器...")
 
         try:
@@ -158,12 +170,25 @@ class SubtitleTranslator:
             if not final_srt_content.strip():
                 raise RuntimeError("翻译结果为空。")
 
+            if reference_lyrics and self.output_mode == "bilingual":
+                self.lyric_gap_details = _suspected_opening_lyric_gaps(final_srt_content, reference_lyrics)
+                self.lyric_gap_warnings = len(self.lyric_gap_details)
+                for issue in self.lyric_gap_details:
+                    print(
+                        "[歌词对齐检查] "
+                        f"约 {issue['time']} 起可能整体顺移：参考歌词首句“{issue['missing_text']}”未识别，"
+                        f"字幕却从下一句“{issue['matched_text']}”开始。系统未自动改轴，请人工复听。"
+                    )
+
             output_path = Path(self.output_srt_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(final_srt_content + "\n", encoding="utf-8")
 
             elapsed = int(time.time() - start_time)
-            print(f"[完成] Next 翻译完成，耗时 {elapsed} 秒。")
+            if self.total_batches and self.cache_hits == self.total_batches and self.api_calls == 0:
+                print(f"[完成] Next 翻译缓存复用完成，整理耗时 {elapsed} 秒。")
+            else:
+                print(f"[完成] Next 翻译完成，耗时 {elapsed} 秒。")
             print(f"[输出] 翻译字幕已保存: {output_path}")
             self._finish_api_trace("completed")
             if progress_cb:
@@ -239,6 +264,22 @@ class SubtitleTranslator:
         print(f"   -> 本次翻译模型: {active_model}")
         print(f"   -> 启动翻译队列，并发 {self.max_workers}，共 {total_batches} 个批次。")
 
+        lyric_contexts: list[str] = []
+        lyric_matches = 0
+        lyric_section_count = 0
+        for idx, batch in enumerate(batches):
+            prev_context = _blocks_to_srt(blocks[max(0, idx * batch_size - 2) : idx * batch_size])
+            selection = select_lyrics_context(reference_lyrics, _blocks_to_srt(batch), prev_context)
+            lyric_contexts.append(selection.text)
+            lyric_section_count = max(lyric_section_count, selection.total_sections)
+            lyric_matches += int(selection.matched)
+        if lyric_section_count > 1:
+            print(
+                "   -> 歌词参考已按粗听内容分段："
+                f"共 {lyric_section_count} 首，{lyric_matches}/{total_batches} 批匹配到相关歌词；"
+                "匹配不足的批次不会强行套用别首歌词。"
+            )
+
         results: list[tuple[int, str]] = []
         completed = 0
         last_logged_pct = -1
@@ -253,7 +294,7 @@ class SubtitleTranslator:
                     prev_context,
                     idx,
                     total_batches,
-                    reference_lyrics,
+                    lyric_contexts[idx],
                     active_model,
                 )
                 future_to_batch[future] = idx
@@ -286,6 +327,8 @@ class SubtitleTranslator:
         reference_lyrics: str,
         target_model: str,
     ) -> tuple[int, str]:
+        if self.fatal_error_event.is_set():
+            raise RuntimeError("翻译配置错误：已停止剩余批次")
         if self.cancel_event and self.cancel_event.is_set():
             raise RuntimeError("用户中断：翻译线程已终止")
 
@@ -301,7 +344,15 @@ class SubtitleTranslator:
         )
         cached = self.translation_cache.get(cache_key)
         original_batch_srt = _blocks_to_srt(batch)
-        if isinstance(cached, str) and cached.strip() and not _same_subtitle_payload(cached, original_batch_srt):
+        cache_usable = (
+            isinstance(cached, str)
+            and bool(cached.strip())
+            and not _same_subtitle_payload(cached, original_batch_srt)
+        )
+        if cache_usable and self.output_mode == "bilingual":
+            cached_bilingual, cached_total = _bilingual_line_counts(cached)
+            cache_usable = cached_total > 0 and cached_bilingual == cached_total
+        if cache_usable:
             self.cache_hits += 1
             self._record_cache_hit(target_model, batch_idx)
             return batch_idx, cached
@@ -319,8 +370,12 @@ class SubtitleTranslator:
         max_retries = 4
         speaker_cleanup_retry = False
         lyric_alignment_retry = False
+        source_fidelity_retry = False
+        bilingual_coverage_retry = False
 
         for attempt in range(max_retries):
+            if self.fatal_error_event.is_set():
+                raise RuntimeError("翻译配置错误：已停止剩余批次")
             if self.cancel_event and self.cancel_event.is_set():
                 raise RuntimeError("用户中断：翻译线程已终止")
 
@@ -335,9 +390,21 @@ class SubtitleTranslator:
                     )
                 if lyric_alignment_retry:
                     request_prompt += (
-                        "\n\n【本批次歌词对齐修正】上次输出把后一时间轴的歌词提前写进前一轴，造成相邻字幕重复。"
-                        "请按每个时间轴的粗听片段重新拆分日文和中文；前一轴只保留前半句，"
-                        "后一轴保留后半句，不得删除时间轴或把后续歌词前移。"
+                        "\n\n【本批次歌词对齐修正】上次输出发生了相邻歌词重复或跨时间轴挪动。"
+                        "每个时间轴必须以该轴自己的粗听内容为边界：若一轴已经听到两句，就让两句留在同一轴；"
+                        "不得为了逐行套歌词而把前一轴内容拆到后一轴，也不得让后续歌词提前。"
+                    )
+                if source_fidelity_retry:
+                    request_prompt += (
+                        "\n\n【本批次保守逐轴翻译】参考歌词连续无法可靠对齐。"
+                        "本次禁止使用参考歌词改写或挪动日文：每个时间轴第一行必须原样复制输入日文，"
+                        "第二行只翻译该轴自己的中文。不得合并、拆分、提前或延后任何一句。"
+                    )
+                if bilingual_coverage_retry:
+                    request_prompt += (
+                        "\n\n【本批次双语完整性修正】上次输出有多条字幕缺少中文。"
+                        "每个时间轴必须保留校正后的日文，并在下一行给出对应中文；"
+                        "不得只复制日文原文，也不得遗漏中文行。"
                     )
                 response = self.client.chat.completions.create(
                     model=target_model,
@@ -391,25 +458,60 @@ class SubtitleTranslator:
                 if lyric_issues and not lyric_alignment_retry:
                     lyric_alignment_retry = True
                     print(
-                        f"      批次 {batch_idx + 1}/{total_batches} 检测到相邻歌词重复，正在局部重试: "
+                        f"      批次 {batch_idx + 1}/{total_batches} 检测到歌词跨轴错位，正在局部重试: "
                         + ", ".join(lyric_issues)
+                    )
+                    continue
+                if lyric_issues and not source_fidelity_retry:
+                    source_fidelity_retry = True
+                    print(
+                        f"      批次 {batch_idx + 1}/{total_batches} 歌词仍无法逐轴对齐，"
+                        "改为原样保留日文并仅补中文。"
                     )
                     continue
                 if lyric_issues:
                     with self.failure_lock:
                         self.lyric_alignment_warnings += len(lyric_issues)
                     print(
-                        f"      [提醒] 批次 {batch_idx + 1}/{total_batches} 仍有相邻歌词重复，请复核: "
+                        f"      [提醒] 批次 {batch_idx + 1}/{total_batches} 仍有歌词跨轴错位，拒绝缓存本批结果: "
                         + ", ".join(lyric_issues)
                     )
+                    raise RuntimeError("参考歌词跨时间轴错位，已拒绝本批结果")
 
                 restored = self._restore_timestamps(result_text, batch)
+                if self.output_mode == "bilingual":
+                    bilingual_cues, total_cues = _bilingual_line_counts(restored)
+                    if _should_retry_bilingual_coverage(
+                        bilingual_cues,
+                        total_cues,
+                        already_retried=bilingual_coverage_retry,
+                    ):
+                        missing_cues = max(0, total_cues - bilingual_cues)
+                        if not bilingual_coverage_retry:
+                            bilingual_coverage_retry = True
+                            with self.failure_lock:
+                                self.bilingual_coverage_retries += 1
+                        print(
+                            f"      批次 {batch_idx + 1}/{total_batches} 有 {missing_cues} 条缺少中文，"
+                            "正在重新翻译。"
+                        )
+                        raise RuntimeError(
+                            f"双语字幕不完整：{bilingual_cues}/{total_cues} 条包含日文和中文"
+                        )
+                    if bilingual_cues < total_cues:
+                        print(
+                            f"      [提醒] 批次 {batch_idx + 1}/{total_batches} 重试后仍有 "
+                            f"{total_cues - bilingual_cues} 条缺少中文，已保留返回结果供人工复核。"
+                        )
                 self._save_to_cache(cache_key, restored)
                 return batch_idx, restored
             except Exception as exc:
                 message = str(exc)
                 self._record_api_error(message, target_model, batch_idx, attempt)
-                if "用户中断" in message or "401" in message or "403" in message:
+                if _is_non_retryable_api_error(message):
+                    self.fatal_error_event.set()
+                    raise
+                if "用户中断" in message or "翻译配置错误" in message:
                     raise
 
                 if attempt == max_retries - 1:
@@ -418,9 +520,13 @@ class SubtitleTranslator:
                         self.failed_batches += 1
                     return batch_idx, original_batch_srt
 
-                sleep_seconds = 8 * (attempt + 1) if "429" in message else 3 * (attempt + 1)
+                sleep_seconds = _retry_delay_seconds(message, attempt)
                 print(f"      批次 {batch_idx + 1}/{total_batches} 失败，{sleep_seconds}s 后重试: {message}")
-                time.sleep(sleep_seconds)
+                if self.cancel_event:
+                    if self.cancel_event.wait(sleep_seconds):
+                        raise RuntimeError("用户中断：已取消翻译重试等待")
+                else:
+                    time.sleep(sleep_seconds)
 
         with self.failure_lock:
             self.failed_batches += 1
@@ -518,7 +624,8 @@ class SubtitleTranslator:
                 "【歌词顺序对齐】同一行歌词如果被相邻时间轴拆开，必须按各时间轴实际听到的片段分配，"
                 "不要在前一轴写完整句、后一轴又重复句尾。除非粗听明确是重复演唱，"
                 "不要把参考歌词中的同一句连续分配给多个时间轴；无法可靠对应时保留当前粗听，"
-                "不要提前套用下一句歌词。"
+                "不要提前套用下一句歌词。若一个粗听时间轴本身已经包含多行歌词，必须把这些歌词保留在该轴，"
+                "严禁为了逐行套歌词而占用后续时间轴。"
             )
             parts.append(f"【参考歌词】\n{reference_lyrics}")
         if prev_context:
@@ -620,7 +727,7 @@ class SubtitleTranslator:
         try:
             data = json.loads(self.cache_file.read_text(encoding="utf-8"))
             if isinstance(data, dict):
-                print(f"   -> 已加载翻译缓存 {len(data)} 个批次。")
+                print(f"   -> 已加载翻译断点库，共 {len(data)} 条历史记录；本次只复用内容匹配的记录。")
                 return {str(key): str(value) for key, value in data.items()}
         except Exception as exc:
             print(f"   -> 翻译缓存读取失败: {exc}")
@@ -631,10 +738,12 @@ class SubtitleTranslator:
             self.translation_cache[cache_key] = text
             try:
                 self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-                self.cache_file.write_text(
+                temp_path = self.cache_file.with_suffix(self.cache_file.suffix + ".tmp")
+                temp_path.write_text(
                     json.dumps(self.translation_cache, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
+                temp_path.replace(self.cache_file)
             except Exception:
                 pass
 
@@ -737,8 +846,12 @@ class SubtitleTranslator:
             self.api_trace["cache_hits"] = self.cache_hits
             self.api_trace["api_calls"] = self.api_calls
             self.api_trace["failed_batches"] = self.failed_batches
+            self.api_trace["alignment_fallbacks"] = self.alignment_fallbacks
+            self.api_trace["bilingual_coverage_retries"] = self.bilingual_coverage_retries
             self.api_trace["speaker_labels_removed"] = self.speaker_labels_removed
             self.api_trace["lyric_alignment_warnings"] = self.lyric_alignment_warnings
+            self.api_trace["lyric_gap_warnings"] = self.lyric_gap_warnings
+            self.api_trace["lyric_gap_details"] = self.lyric_gap_details
             self.api_trace["returned_models"] = sorted(self.returned_models)
             if error:
                 safe_error = error.replace(self.api_key, "[REDACTED]") if self.api_key else error
@@ -783,17 +896,7 @@ def _utc_now() -> str:
 
 
 def _normalize_proxy_url(proxy_url: str) -> str:
-    proxy = str(proxy_url or "").strip().rstrip("/")
-    if not proxy:
-        return ""
-    if re.fullmatch(r"\d{1,5}", proxy):
-        port = int(proxy)
-        if not 1 <= port <= 65535:
-            raise ValueError("代理端口必须在 1-65535 之间。")
-        return f"http://127.0.0.1:{port}"
-    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", proxy):
-        return proxy
-    return f"http://{proxy}"
+    return normalize_proxy_url(proxy_url)
 
 
 def _parse_srt_text(content: str) -> list[SrtBlock]:
@@ -864,10 +967,146 @@ def _suspected_lyric_sequence_issues(content: str, source_blocks: list[SrtBlock]
         source_right = _normalize_lyric_text(right_source.text_lines[0])
         if not _is_repeated_lyric_tail(left_text, right_text):
             continue
+        # A short source tail can legitimately be included in the preceding
+        # corrected lyric line (for example: "...全部が疲れたよ" followed by
+        # a rough-ASR "疲れたよ"). Do not reject the whole batch for this.
+        if len(source_right) < 5:
+            continue
         if _is_repeated_lyric_tail(source_left, source_right):
             continue
         issues.append(f"{left_source.index}->{right_source.index}")
-    return issues
+
+    source_texts = [_normalize_lyric_text(block.text_lines[0]) if block.text_lines else "" for block in source_blocks]
+    for target_position, target_source in enumerate(source_blocks):
+        translated_block = by_time.get(_normalize_time_line(target_source.time_line))
+        if translated_block is None or not translated_block.text_lines:
+            continue
+        output_text = _normalize_lyric_text(translated_block.text_lines[0])
+        own_source = source_texts[target_position]
+        if _meaningful_lyric_containment(output_text, own_source):
+            continue
+        lower = max(0, target_position - 3)
+        upper = min(len(source_blocks), target_position + 4)
+        for source_position in range(lower, upper):
+            if source_position == target_position:
+                continue
+            if not _meaningful_lyric_containment(output_text, source_texts[source_position]):
+                continue
+            issues.append(f"{source_blocks[source_position].index}=>{target_source.index}")
+            break
+    return list(dict.fromkeys(issues))
+
+
+def _suspected_opening_lyric_gaps(content: str, reference_lyrics: str) -> list[dict[str, object]]:
+    output_blocks = _parse_srt_text(content)
+    if not output_blocks:
+        return []
+    output_texts = [
+        _normalize_lyric_text(block.text_lines[0]) if block.text_lines else "" for block in output_blocks
+    ]
+    for section in parse_lyrics_sections(reference_lyrics):
+        reference_lines = list(section.lyric_lines)
+        if len(reference_lines) < 3:
+            continue
+        # A strong later refrain match means this clip likely starts at a
+        # repeated verse; do not compare it with the song's first verse.
+        if _has_later_reference_run(output_texts, reference_lines):
+            continue
+        issue = _opening_gap_for_reference_section(output_blocks, output_texts, reference_lines)
+        if issue:
+            return [issue]
+    return []
+
+
+def _opening_gap_for_reference_section(
+    output_blocks: list[SrtBlock],
+    output_texts: list[str],
+    reference_lines: list[str],
+) -> dict[str, object] | None:
+    first = _normalize_lyric_text(reference_lines[0])
+    second = _normalize_lyric_text(reference_lines[1])
+    following = [_normalize_lyric_text(line) for line in reference_lines[2:5]]
+    if min(len(first), len(second)) < 4:
+        return None
+    for position, output_text in enumerate(output_texts):
+        if not _contains_lyric_line(output_text, second):
+            continue
+        nearby_before = output_texts[max(0, position - 4) : position + 1]
+        if any(_contains_lyric_line(text, first) for text in nearby_before):
+            return None
+        nearby_after = output_texts[position : min(len(output_texts), position + 4)]
+        if not any(
+            _contains_lyric_line(text, line)
+            for text in nearby_after
+            for line in following
+            if len(line) >= 4
+        ):
+            continue
+        block = output_blocks[position]
+        return {
+            "cue_index": block.index,
+            "time": block.time_line.split("-->", 1)[0].strip(),
+            "missing_text": reference_lines[0],
+            "matched_text": reference_lines[1],
+            "review_only": True,
+        }
+    return None
+
+
+def _has_later_reference_run(
+    output_texts: list[str],
+    reference_lines: list[str],
+    *,
+    later_start: int = 7,
+    minimum_run: int = 3,
+) -> bool:
+    normalized_reference = [_normalize_lyric_text(line) for line in reference_lines]
+    for output_start in range(len(output_texts)):
+        for reference_start in range(later_start, len(normalized_reference)):
+            run = 0
+            for offset in range(
+                min(8, len(output_texts) - output_start, len(normalized_reference) - reference_start)
+            ):
+                output_text = output_texts[output_start + offset]
+                reference_text = normalized_reference[reference_start + offset]
+                if not output_text or not reference_text:
+                    break
+                score = difflib.SequenceMatcher(
+                    None,
+                    output_text,
+                    reference_text,
+                    autojunk=False,
+                ).ratio()
+                if score < 0.80:
+                    break
+                run += 1
+            if run >= minimum_run:
+                return True
+    return False
+
+
+def _reference_lyric_lines(reference_lyrics: str) -> list[str]:
+    result: list[str] = []
+    for position, raw_line in enumerate(str(reference_lyrics or "").splitlines()):
+        line = raw_line.strip()
+        if not line:
+            continue
+        if position < 4 and re.search(r"\s[-–—]\s", line):
+            continue
+        if re.match(
+            r"^(?:词|詞|曲|作词|作詞|作曲|编曲|編曲|制作人|歌手|artist|lyrics|music)\s*[:：]",
+            line,
+            flags=re.IGNORECASE,
+        ):
+            continue
+        if line.startswith(("[", "【")) and line.endswith(("]", "】")):
+            continue
+        result.append(line)
+    return result
+
+
+def _contains_lyric_line(output_text: str, reference_line: str) -> bool:
+    return bool(output_text and reference_line and (reference_line in output_text or output_text in reference_line))
 
 
 def _normalize_lyric_text(text: str) -> str:
@@ -876,6 +1115,12 @@ def _normalize_lyric_text(text: str) -> str:
 
 def _is_repeated_lyric_tail(left: str, right: str) -> bool:
     return len(right) >= 4 and (left == right or (len(left) > len(right) and left.endswith(right)))
+
+
+def _meaningful_lyric_containment(left: str, right: str) -> bool:
+    if min(len(left), len(right)) < 5:
+        return False
+    return left in right or right in left
 
 
 def _strip_known_speaker_labels(content: str) -> tuple[str, int]:
@@ -906,6 +1151,28 @@ def _blocks_to_srt(blocks: list[SrtBlock]) -> str:
 
 def _same_subtitle_payload(left: str, right: str) -> bool:
     return _subtitle_payload(left) == _subtitle_payload(right)
+
+
+def _bilingual_line_counts(content: str) -> tuple[int, int]:
+    blocks = _parse_srt_text(content)
+    bilingual = sum(
+        1 for block in blocks if len([line for line in block.text_lines if line.strip()]) >= 2
+    )
+    return bilingual, len(blocks)
+
+
+def _should_retry_bilingual_coverage(
+    bilingual_cues: int,
+    total_cues: int,
+    *,
+    already_retried: bool,
+) -> bool:
+    if total_cues <= 0 or bilingual_cues >= total_cues:
+        return False
+    if not already_retried:
+        return True
+    required_cues = max(1, (total_cues * 4 + 4) // 5)
+    return bilingual_cues < required_cues
 
 
 def _subtitle_payload(content: str) -> list[str]:
@@ -943,6 +1210,15 @@ def _batch_cache_key(
     }
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
+
+def _is_non_retryable_api_error(message: str) -> bool:
+    text = str(message or "")
+    return bool(re.search(r"(?i)(?:error\s*code|status\s*code|http)?\s*[:=]?\s*(400|401|403|404|422)\b", text))
+
+
+def _retry_delay_seconds(message: str, attempt: int) -> int:
+    return (8 if re.search(r"\b429\b", str(message or "")) else 3) * (attempt + 1)
 
 
 def _proper_noun_profile(context_title: str) -> str:

@@ -1,0 +1,891 @@
+{
+  "id": "majiko-kokoronashi-preserve-negative",
+  "description": "Aligned real lyrics must not overwrite overlapping source cues without strict evidence.",
+  "status": "PASS",
+  "elapsed_seconds": 55.45,
+  "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\心做\\audio\\f8ec283b_源音频.wav",
+  "window": {
+    "start": 180.0,
+    "end": 202.0
+  },
+  "expected_lines": [
+    "君にどれだけ愛されても",
+    "僕の心臓は一つだけ",
+    "やめてよ やめてよ"
+  ],
+  "source_srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\心做\\subtitles\\心做_极致打轴.srt",
+  "source_srt_sha256_before": "323A55FF18D1FB1838EAB15042F56B519196F71529730DC4A0D0D0DD209E11CE",
+  "source_srt_sha256_after": "323A55FF18D1FB1838EAB15042F56B519196F71529730DC4A0D0D0DD209E11CE",
+  "preview_written": false,
+  "preview_path": "",
+  "full_preview_written": false,
+  "full_preview_path": "",
+  "full_preview_rejection_reason": "strict_alignment_preview_not_available",
+  "blocking_source_cue": null,
+  "replaced_source_cues": [],
+  "expectations": {
+    "expect_full_preview_written": false,
+    "expect_source_unchanged": true
+  },
+  "evaluation": {
+    "passed": true,
+    "failures": []
+  },
+  "generic_probe": {
+    "label": "source_generic",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v3\\majiko-kokoronashi-preserve-negative\\source_window.wav",
+    "prompt_contains_expected_lyrics": false,
+    "segment_count": 6,
+    "matched_line_count": 0,
+    "average_match_score": 0.1136,
+    "matches": [
+      {
+        "expected": "君にどれだけ愛されても",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "僕の心臓は一つだけ",
+        "detected": "演奏中の歌詞は、",
+        "score": 0.25,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "やめてよ やめてよ",
+        "detected": "歌詞の意味がわかりやすいです。",
+        "score": 0.0909,
+        "start": null,
+        "end": null,
+        "accepted": false
+      }
+    ],
+    "segments": [
+      {
+        "start": 188.24,
+        "end": 190.18,
+        "text": "演奏中の歌詞は、",
+        "avg_logprob": -0.3657,
+        "no_speech_prob": 0.2681,
+        "words": [
+          {
+            "start": 188.24,
+            "end": 189.08,
+            "word": "演",
+            "probability": 0.0
+          },
+          {
+            "start": 189.08,
+            "end": 189.92,
+            "word": "奏",
+            "probability": 0.8926
+          },
+          {
+            "start": 189.92,
+            "end": 189.92,
+            "word": "中",
+            "probability": 0.1714
+          },
+          {
+            "start": 189.92,
+            "end": 190.1,
+            "word": "の",
+            "probability": 0.1385
+          },
+          {
+            "start": 190.1,
+            "end": 190.16,
+            "word": "歌",
+            "probability": 0.0188
+          },
+          {
+            "start": 190.16,
+            "end": 190.16,
+            "word": "詞",
+            "probability": 0.714
+          },
+          {
+            "start": 190.16,
+            "end": 190.18,
+            "word": "は、",
+            "probability": 0.1615
+          }
+        ]
+      },
+      {
+        "start": 190.18,
+        "end": 191.86,
+        "text": "歌詞の意味がわかりやすいです。",
+        "avg_logprob": -0.3657,
+        "no_speech_prob": 0.2681,
+        "words": [
+          {
+            "start": 190.18,
+            "end": 190.18,
+            "word": "歌",
+            "probability": 0.0184
+          },
+          {
+            "start": 190.18,
+            "end": 190.24,
+            "word": "詞",
+            "probability": 0.7522
+          },
+          {
+            "start": 190.24,
+            "end": 190.24,
+            "word": "の",
+            "probability": 0.2061
+          },
+          {
+            "start": 190.24,
+            "end": 190.24,
+            "word": "意",
+            "probability": 0.0787
+          },
+          {
+            "start": 190.24,
+            "end": 190.24,
+            "word": "味",
+            "probability": 0.9722
+          },
+          {
+            "start": 190.24,
+            "end": 190.24,
+            "word": "が",
+            "probability": 0.2856
+          },
+          {
+            "start": 190.24,
+            "end": 190.48,
+            "word": "わか",
+            "probability": 0.0847
+          },
+          {
+            "start": 190.48,
+            "end": 190.48,
+            "word": "り",
+            "probability": 0.6328
+          },
+          {
+            "start": 190.48,
+            "end": 190.48,
+            "word": "や",
+            "probability": 0.6729
+          },
+          {
+            "start": 190.48,
+            "end": 190.86,
+            "word": "す",
+            "probability": 0.9995
+          },
+          {
+            "start": 190.86,
+            "end": 191.86,
+            "word": "い",
+            "probability": 0.7344
+          },
+          {
+            "start": 191.86,
+            "end": 191.86,
+            "word": "です。",
+            "probability": 0.3206
+          }
+        ]
+      },
+      {
+        "start": 192.06,
+        "end": 195.62,
+        "text": "演奏中の歌詞は、",
+        "avg_logprob": -0.3657,
+        "no_speech_prob": 0.2681,
+        "words": [
+          {
+            "start": 192.06,
+            "end": 192.96,
+            "word": "演",
+            "probability": 0.3203
+          },
+          {
+            "start": 192.96,
+            "end": 194.84,
+            "word": "奏",
+            "probability": 0.9639
+          },
+          {
+            "start": 194.84,
+            "end": 194.84,
+            "word": "中",
+            "probability": 0.9819
+          },
+          {
+            "start": 194.84,
+            "end": 194.84,
+            "word": "の",
+            "probability": 0.9922
+          },
+          {
+            "start": 194.84,
+            "end": 194.84,
+            "word": "歌",
+            "probability": 0.9751
+          },
+          {
+            "start": 194.84,
+            "end": 194.84,
+            "word": "詞",
+            "probability": 0.9998
+          },
+          {
+            "start": 194.84,
+            "end": 195.62,
+            "word": "は、",
+            "probability": 0.7192
+          }
+        ]
+      },
+      {
+        "start": 196.12,
+        "end": 197.88,
+        "text": "演奏中の歌詞は、",
+        "avg_logprob": -0.3657,
+        "no_speech_prob": 0.2681,
+        "words": [
+          {
+            "start": 196.12,
+            "end": 196.12,
+            "word": "演",
+            "probability": 0.4514
+          },
+          {
+            "start": 196.12,
+            "end": 196.88,
+            "word": "奏",
+            "probability": 0.9648
+          },
+          {
+            "start": 196.88,
+            "end": 196.9,
+            "word": "中",
+            "probability": 0.9868
+          },
+          {
+            "start": 196.9,
+            "end": 196.9,
+            "word": "の",
+            "probability": 0.9917
+          },
+          {
+            "start": 196.9,
+            "end": 196.9,
+            "word": "歌",
+            "probability": 0.9707
+          },
+          {
+            "start": 196.9,
+            "end": 196.9,
+            "word": "詞",
+            "probability": 0.9998
+          },
+          {
+            "start": 196.9,
+            "end": 197.88,
+            "word": "は、",
+            "probability": 0.9375
+          }
+        ]
+      },
+      {
+        "start": 197.92,
+        "end": 200.78,
+        "text": "演奏中の歌詞は、",
+        "avg_logprob": -0.3657,
+        "no_speech_prob": 0.2681,
+        "words": [
+          {
+            "start": 197.92,
+            "end": 198.38,
+            "word": "演",
+            "probability": 0.6831
+          },
+          {
+            "start": 198.38,
+            "end": 200.32,
+            "word": "奏",
+            "probability": 0.9688
+          },
+          {
+            "start": 200.32,
+            "end": 200.32,
+            "word": "中",
+            "probability": 0.9917
+          },
+          {
+            "start": 200.32,
+            "end": 200.48,
+            "word": "の",
+            "probability": 0.9932
+          },
+          {
+            "start": 200.48,
+            "end": 200.78,
+            "word": "歌",
+            "probability": 0.9702
+          },
+          {
+            "start": 200.78,
+            "end": 200.78,
+            "word": "詞",
+            "probability": 0.9998
+          },
+          {
+            "start": 200.78,
+            "end": 200.78,
+            "word": "は、",
+            "probability": 0.9766
+          }
+        ]
+      },
+      {
+        "start": 201.58,
+        "end": 201.94,
+        "text": "S.S.G",
+        "avg_logprob": -0.709,
+        "no_speech_prob": 0.7285,
+        "words": [
+          {
+            "start": 201.58,
+            "end": 201.7,
+            "word": "S.",
+            "probability": 0.1247
+          },
+          {
+            "start": 201.7,
+            "end": 201.82,
+            "word": "S.",
+            "probability": 0.981
+          },
+          {
+            "start": 201.88,
+            "end": 201.94,
+            "word": "G",
+            "probability": 0.7144
+          }
+        ]
+      }
+    ],
+    "elapsed_seconds": 22.98
+  },
+  "lyrics_probe": {
+    "label": "source_lyrics",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v3\\majiko-kokoronashi-preserve-negative\\source_window.wav",
+    "prompt_contains_expected_lyrics": true,
+    "segment_count": 1,
+    "matched_line_count": 0,
+    "average_match_score": 0.0815,
+    "matches": [
+      {
+        "expected": "君にどれだけ愛されても",
+        "detected": "やさしい言葉 ＼ｽ］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］�",
+        "score": 0.1111,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "僕の心臓は一つだけ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "やめてよ やめてよ",
+        "detected": "やさしい言葉 ＼ｽ］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］�",
+        "score": 0.1333,
+        "start": null,
+        "end": null,
+        "accepted": false
+      }
+    ],
+    "segments": [
+      {
+        "start": 198.78,
+        "end": 201.98,
+        "text": "やさしい言葉 ＼ｽ］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］］�",
+        "avg_logprob": -0.1224,
+        "no_speech_prob": 0.0086,
+        "words": [
+          {
+            "start": 198.78,
+            "end": 200.18,
+            "word": "や",
+            "probability": 0.0004
+          },
+          {
+            "start": 200.18,
+            "end": 201.58,
+            "word": "さ",
+            "probability": 0.0362
+          },
+          {
+            "start": 201.58,
+            "end": 201.98,
+            "word": "しい",
+            "probability": 0.7046
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "言",
+            "probability": 0.0252
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "葉",
+            "probability": 0.8364
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "＼",
+            "probability": 0.1874
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "ｽ",
+            "probability": 0.413
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.5746
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.8153
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.84
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.8701
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.891
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9062
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9146
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9222
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9289
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9323
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9372
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9404
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9419
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9434
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9447
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9466
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9492
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9487
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9507
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9508
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9508
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.953
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9552
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9561
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9561
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9585
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9593
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9588
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.96
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9618
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9631
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9642
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9648
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9647
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9658
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9665
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9661
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9655
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9666
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9668
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9674
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9686
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9683
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9684
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9688
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9691
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9691
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9701
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9704
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9696
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9694
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9702
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9699
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9696
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9696
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9701
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9688
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9686
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9684
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9683
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9689
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9692
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9694
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9699
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9712
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9712
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.972
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9723
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9717
+          },
+          {
+            "start": 201.98,
+            "end": 201.98,
+            "word": "］",
+            "probability": 0.9736
+          }
+        ]
+      }
+    ],
+    "elapsed_seconds": 32.45
+  }
+}

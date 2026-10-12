@@ -1,0 +1,417 @@
+{
+  "id": "yama-color-opening-positive",
+  "description": "Color opening lyrics missing from the default recognition should be recoverable.",
+  "status": "PASS",
+  "elapsed_seconds": 21.19,
+  "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\research-color-opening-direct-media-155-210\\audio\\d6c35998_源音频.wav",
+  "window": {
+    "start": 24.0,
+    "end": 35.0
+  },
+  "expected_lines": [
+    "じっと日々を見逃さないで",
+    "きっと大人はそれらしくするので",
+    "かかりきりになるんだ",
+    "関心はまだ僕ら"
+  ],
+  "source_srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\research-color-opening-02m33s-03m28s-v3\\subtitles\\research-color-opening-02m33s-03m28s-v3_极致打轴.srt",
+  "source_srt_sha256_before": "17BBC349FBBB9F7958715A3D9A15005BAC7EB93E7C8EDDE4D32CDEF559DA92E7",
+  "source_srt_sha256_after": "17BBC349FBBB9F7958715A3D9A15005BAC7EB93E7C8EDDE4D32CDEF559DA92E7",
+  "preview_written": true,
+  "preview_path": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v2\\yama-color-opening-positive\\lyric_alignment_preview.srt",
+  "full_preview_written": true,
+  "full_preview_path": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v2\\yama-color-opening-positive\\lyric_alignment_full_preview.srt",
+  "full_preview_rejection_reason": "",
+  "blocking_source_cue": null,
+  "replaced_source_cues": [],
+  "expectations": {
+    "minimum_lyrics_matches": 4,
+    "expect_preview_written": true,
+    "expect_full_preview_written": true,
+    "expect_source_unchanged": true
+  },
+  "evaluation": {
+    "passed": true,
+    "failures": []
+  },
+  "generic_probe": {
+    "label": "source_generic",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v2\\yama-color-opening-positive\\source_window.wav",
+    "prompt_contains_expected_lyrics": false,
+    "segment_count": 1,
+    "matched_line_count": 0,
+    "average_match_score": 0.0,
+    "matches": [
+      {
+        "expected": "じっと日々を見逃さないで",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "きっと大人はそれらしくするので",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "かかりきりになるんだ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "関心はまだ僕ら",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      }
+    ],
+    "segments": [
+      {
+        "start": 27.12,
+        "end": 30.88,
+        "text": "​​​​​​​",
+        "avg_logprob": -0.6169,
+        "no_speech_prob": 0.8726,
+        "words": [
+          {
+            "start": 27.12,
+            "end": 27.84,
+            "word": "​",
+            "probability": 0.2316
+          },
+          {
+            "start": 27.84,
+            "end": 28.56,
+            "word": "​",
+            "probability": 0.7682
+          },
+          {
+            "start": 28.56,
+            "end": 28.6,
+            "word": "​",
+            "probability": 0.9863
+          },
+          {
+            "start": 28.6,
+            "end": 28.62,
+            "word": "​",
+            "probability": 0.8968
+          },
+          {
+            "start": 28.62,
+            "end": 28.7,
+            "word": "​",
+            "probability": 0.932
+          },
+          {
+            "start": 28.7,
+            "end": 29.06,
+            "word": "​",
+            "probability": 0.966
+          },
+          {
+            "start": 29.06,
+            "end": 30.88,
+            "word": "​",
+            "probability": 0.9761
+          }
+        ]
+      }
+    ],
+    "elapsed_seconds": 10.91
+  },
+  "lyrics_probe": {
+    "label": "source_lyrics",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v2\\yama-color-opening-positive\\source_window.wav",
+    "prompt_contains_expected_lyrics": true,
+    "segment_count": 1,
+    "matched_line_count": 4,
+    "average_match_score": 1.0,
+    "matches": [
+      {
+        "expected": "じっと日々を見逃さないで",
+        "detected": "じっと日々を見逃さないで",
+        "score": 1.0,
+        "start": 25.76,
+        "end": 28.18,
+        "accepted": true,
+        "evidence": "word_timestamps",
+        "average_word_probability": 0.8084
+      },
+      {
+        "expected": "きっと大人はそれらしくするので",
+        "detected": "きっと大人はそれらしくするので",
+        "score": 1.0,
+        "start": 28.3,
+        "end": 31.0,
+        "accepted": true,
+        "evidence": "word_timestamps",
+        "average_word_probability": 0.8516
+      },
+      {
+        "expected": "かかりきりになるんだ",
+        "detected": "かかりきりになるんだ",
+        "score": 1.0,
+        "start": 31.34,
+        "end": 32.96,
+        "accepted": true,
+        "evidence": "word_timestamps",
+        "average_word_probability": 0.9212
+      },
+      {
+        "expected": "関心はまだ僕ら",
+        "detected": "関心はまだ僕ら",
+        "score": 1.0,
+        "start": 33.4,
+        "end": 34.98,
+        "accepted": true,
+        "evidence": "word_timestamps",
+        "average_word_probability": 0.9107
+      }
+    ],
+    "segments": [
+      {
+        "start": 25.76,
+        "end": 34.98,
+        "text": "じっと日々を見逃さないできっと大人はそれらしくするのでかかりきりになるんだ関心はまだ僕ら",
+        "avg_logprob": -0.3369,
+        "no_speech_prob": 0.7949,
+        "words": [
+          {
+            "start": 25.76,
+            "end": 26.2,
+            "word": "じ",
+            "probability": 0.0097
+          },
+          {
+            "start": 26.2,
+            "end": 26.48,
+            "word": "っと",
+            "probability": 0.9858
+          },
+          {
+            "start": 26.48,
+            "end": 26.78,
+            "word": "日",
+            "probability": 0.1617
+          },
+          {
+            "start": 26.78,
+            "end": 26.9,
+            "word": "々",
+            "probability": 0.9658
+          },
+          {
+            "start": 26.9,
+            "end": 27.02,
+            "word": "を",
+            "probability": 0.9922
+          },
+          {
+            "start": 27.02,
+            "end": 27.14,
+            "word": "見",
+            "probability": 0.9849
+          },
+          {
+            "start": 27.14,
+            "end": 27.3,
+            "word": "逃",
+            "probability": 0.998
+          },
+          {
+            "start": 27.3,
+            "end": 27.54,
+            "word": "さ",
+            "probability": 0.9932
+          },
+          {
+            "start": 27.54,
+            "end": 27.76,
+            "word": "ない",
+            "probability": 0.9985
+          },
+          {
+            "start": 27.76,
+            "end": 28.18,
+            "word": "で",
+            "probability": 0.9937
+          },
+          {
+            "start": 28.18,
+            "end": 28.3,
+            "word": "",
+            "probability": 0.0281
+          },
+          {
+            "start": 28.3,
+            "end": 28.48,
+            "word": "き",
+            "probability": 0.4409
+          },
+          {
+            "start": 28.48,
+            "end": 28.62,
+            "word": "っと",
+            "probability": 0.9922
+          },
+          {
+            "start": 28.62,
+            "end": 28.88,
+            "word": "大",
+            "probability": 0.9526
+          },
+          {
+            "start": 28.88,
+            "end": 28.98,
+            "word": "人",
+            "probability": 1.0
+          },
+          {
+            "start": 28.98,
+            "end": 29.18,
+            "word": "は",
+            "probability": 0.9863
+          },
+          {
+            "start": 29.18,
+            "end": 29.36,
+            "word": "それ",
+            "probability": 0.9507
+          },
+          {
+            "start": 29.36,
+            "end": 29.54,
+            "word": "ら",
+            "probability": 0.9946
+          },
+          {
+            "start": 29.54,
+            "end": 29.76,
+            "word": "しく",
+            "probability": 0.9644
+          },
+          {
+            "start": 29.76,
+            "end": 30.46,
+            "word": "する",
+            "probability": 0.9165
+          },
+          {
+            "start": 30.46,
+            "end": 31.0,
+            "word": "ので",
+            "probability": 0.3179
+          },
+          {
+            "start": 31.0,
+            "end": 31.34,
+            "word": "",
+            "probability": 0.763
+          },
+          {
+            "start": 31.34,
+            "end": 31.42,
+            "word": "か",
+            "probability": 0.7417
+          },
+          {
+            "start": 31.42,
+            "end": 31.58,
+            "word": "か",
+            "probability": 0.9956
+          },
+          {
+            "start": 31.58,
+            "end": 31.68,
+            "word": "り",
+            "probability": 0.9951
+          },
+          {
+            "start": 31.68,
+            "end": 31.78,
+            "word": "き",
+            "probability": 0.7378
+          },
+          {
+            "start": 31.78,
+            "end": 32.04,
+            "word": "り",
+            "probability": 0.9849
+          },
+          {
+            "start": 32.04,
+            "end": 32.48,
+            "word": "にな",
+            "probability": 0.9482
+          },
+          {
+            "start": 32.48,
+            "end": 32.62,
+            "word": "る",
+            "probability": 0.9976
+          },
+          {
+            "start": 32.62,
+            "end": 32.96,
+            "word": "んだ",
+            "probability": 0.9688
+          },
+          {
+            "start": 32.96,
+            "end": 33.4,
+            "word": "",
+            "probability": 0.8156
+          },
+          {
+            "start": 33.4,
+            "end": 33.58,
+            "word": "関",
+            "probability": 0.7487
+          },
+          {
+            "start": 33.58,
+            "end": 33.86,
+            "word": "心",
+            "probability": 0.999
+          },
+          {
+            "start": 33.86,
+            "end": 34.2,
+            "word": "は",
+            "probability": 0.9956
+          },
+          {
+            "start": 34.2,
+            "end": 34.54,
+            "word": "まだ",
+            "probability": 0.8706
+          },
+          {
+            "start": 34.54,
+            "end": 34.82,
+            "word": "僕",
+            "probability": 0.8765
+          },
+          {
+            "start": 34.82,
+            "end": 34.98,
+            "word": "ら",
+            "probability": 0.9736
+          }
+        ]
+      }
+    ],
+    "elapsed_seconds": 10.23
+  }
+}

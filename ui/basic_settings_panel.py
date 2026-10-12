@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 import customtkinter as ctk
 
@@ -38,7 +38,7 @@ class BasicSettingsPanel(ctk.CTkScrollableFrame):
         )
         row += 1
 
-        row = self._add_group("算力调度 (Hardware)", row)
+        row = self._add_group("人声分离算力 (Demucs Hardware)", row)
         self.opt_hardware = self._option(
             row,
             HARDWARE_MODE_OPTIONS,
@@ -51,6 +51,7 @@ class BasicSettingsPanel(ctk.CTkScrollableFrame):
             row,
             DEMUCS_OPTIONS,
             self.settings.get("use_demucs", DEFAULT_DEMUCS_OPTION),
+            command=self._on_demucs_change,
         )
         row += 1
 
@@ -59,11 +60,15 @@ class BasicSettingsPanel(ctk.CTkScrollableFrame):
             text="建议先跳过，快速生成打轴结果；需要更干净的人声时再开启 Demucs。CPU 模式会明显变慢。",
             font=ctk.CTkFont(family="Microsoft YaHei", size=11),
             text_color="#A1A1AA",
-            wraplength=300,
+            wraplength=270,
             justify="left",
+            anchor="w",
         )
-        self.demucs_hint_label.grid(row=row, column=0, padx=20, pady=(0, 10), sticky="w")
+        self.demucs_hint_label.grid(row=row, column=0, padx=20, pady=(0, 10), sticky="ew")
+        self.bind("<Configure>", self._fit_demucs_hint)
         row += 1
+        self._on_demucs_change(self.opt_demucs.get())
+        self.after_idle(self._sync_demucs_hint_width)
 
         row = self._add_group("引擎精度 (Whisper)", row)
         self.opt_model = self._option(
@@ -98,7 +103,13 @@ class BasicSettingsPanel(ctk.CTkScrollableFrame):
         ).grid(row=row, column=0, padx=20, pady=(15, 2), sticky="w")
         return row + 1
 
-    def _option(self, row: int, values: list[str], value: object) -> ctk.CTkOptionMenu:
+    def _option(
+        self,
+        row: int,
+        values: list[str],
+        value: object,
+        command: Callable[[str], object] | None = None,
+    ) -> ctk.CTkOptionMenu:
         option = ctk.CTkOptionMenu(
             self,
             font=ctk.CTkFont(family="Microsoft YaHei", size=13),
@@ -107,8 +118,33 @@ class BasicSettingsPanel(ctk.CTkScrollableFrame):
             text_color=TEXT_TITLE,
             button_color="#222222",
             button_hover_color="#2A2A2A",
+            command=command,
         )
         selected = str(value or values[0])
         option.set(selected if selected in values else values[0])
         option.grid(row=row, column=0, padx=20, pady=(0, 10), sticky="ew")
         return option
+
+    def _on_demucs_change(self, choice: str) -> None:
+        skipped = "跳过" in str(choice)
+        self.opt_hardware.configure(state="disabled" if skipped else "normal")
+        hint = (
+            "Whisper 会自动优先使用 GPU。当前跳过人声分离，无需设置显存档位。"
+            if skipped
+            else "自动档会按显存选择 Demucs 分段；显存紧张时可手动选保守分离。"
+        )
+        self.demucs_hint_label.configure(text=hint)
+
+    def _fit_demucs_hint(self, event: object) -> None:
+        if int(getattr(event, "width", 0)) > 50:
+            self._sync_demucs_hint_width()
+
+    def _sync_demucs_hint_width(self) -> None:
+        # Leave room for the frame padding and keep the label left-aligned so
+        # long Chinese hints never lose their first characters in a narrow
+        # sidebar.
+        width = self.winfo_width()
+        if width <= 50 or not self.demucs_hint_label.winfo_exists():
+            return
+        wraplength = max(170, width - 40)
+        self.demucs_hint_label.configure(wraplength=wraplength)

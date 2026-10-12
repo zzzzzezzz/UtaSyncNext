@@ -1,0 +1,1407 @@
+{
+  "id": "yama-aiwotoku-piano-negative",
+  "description": "A piano-only interlude must not become a complete prompted chorus.",
+  "status": "PASS",
+  "elapsed_seconds": 66.01,
+  "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\research-aiwotoku-piano-12m30s-13m45s\\audio\\9990ffa1_源音频.wav",
+  "window": {
+    "start": 0.0,
+    "end": 30.0
+  },
+  "expected_lines": [
+    "手放したっていいさ",
+    "傷を付け合う運命",
+    "ぞんざいな日々は",
+    "手離したっていいさ",
+    "軽薄な言葉も紛れもなく愛だろ"
+  ],
+  "source_srt": "",
+  "source_srt_sha256_before": "",
+  "source_srt_sha256_after": "",
+  "preview_written": false,
+  "preview_path": "",
+  "full_preview_written": false,
+  "full_preview_path": "",
+  "full_preview_rejection_reason": "strict_alignment_preview_not_available",
+  "blocking_source_cue": null,
+  "replaced_source_cues": [],
+  "expectations": {
+    "maximum_lyrics_matches": 2,
+    "expect_preview_written": false,
+    "expect_full_preview_written": false,
+    "expect_source_unchanged": true
+  },
+  "evaluation": {
+    "passed": true,
+    "failures": []
+  },
+  "generic_probe": {
+    "label": "source_generic",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v3\\yama-aiwotoku-piano-negative\\source_window.wav",
+    "prompt_contains_expected_lyrics": false,
+    "segment_count": 1,
+    "matched_line_count": 0,
+    "average_match_score": 0.0,
+    "matches": [
+      {
+        "expected": "手放したっていいさ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "傷を付け合う運命",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "ぞんざいな日々は",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "手離したっていいさ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "軽薄な言葉も紛れもなく愛だろ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      }
+    ],
+    "segments": [
+      {
+        "start": 6.22,
+        "end": 29.98,
+        "text": "演奏中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞中の歌詞",
+        "avg_logprob": -0.0949,
+        "no_speech_prob": 0.9082,
+        "words": [
+          {
+            "start": 6.22,
+            "end": 7.26,
+            "word": "演",
+            "probability": 0.0001
+          },
+          {
+            "start": 7.26,
+            "end": 7.26,
+            "word": "奏",
+            "probability": 0.7786
+          },
+          {
+            "start": 7.26,
+            "end": 7.26,
+            "word": "中",
+            "probability": 0.1676
+          },
+          {
+            "start": 7.26,
+            "end": 7.26,
+            "word": "の",
+            "probability": 0.2588
+          },
+          {
+            "start": 7.26,
+            "end": 7.26,
+            "word": "歌",
+            "probability": 0.0138
+          },
+          {
+            "start": 7.26,
+            "end": 7.26,
+            "word": "詞",
+            "probability": 0.7959
+          },
+          {
+            "start": 7.26,
+            "end": 7.26,
+            "word": "中",
+            "probability": 0.0012
+          },
+          {
+            "start": 7.26,
+            "end": 7.98,
+            "word": "の",
+            "probability": 0.4307
+          },
+          {
+            "start": 7.98,
+            "end": 7.98,
+            "word": "歌",
+            "probability": 0.4504
+          },
+          {
+            "start": 7.98,
+            "end": 8.0,
+            "word": "詞",
+            "probability": 0.9939
+          },
+          {
+            "start": 8.0,
+            "end": 11.34,
+            "word": "中",
+            "probability": 0.0939
+          },
+          {
+            "start": 11.34,
+            "end": 11.66,
+            "word": "の",
+            "probability": 0.9653
+          },
+          {
+            "start": 11.66,
+            "end": 13.12,
+            "word": "歌",
+            "probability": 0.9199
+          },
+          {
+            "start": 13.12,
+            "end": 13.12,
+            "word": "詞",
+            "probability": 0.9978
+          },
+          {
+            "start": 13.12,
+            "end": 22.64,
+            "word": "中",
+            "probability": 0.6001
+          },
+          {
+            "start": 22.64,
+            "end": 22.8,
+            "word": "の",
+            "probability": 0.9771
+          },
+          {
+            "start": 22.8,
+            "end": 24.94,
+            "word": "歌",
+            "probability": 0.9556
+          },
+          {
+            "start": 24.94,
+            "end": 24.94,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 24.94,
+            "end": 29.72,
+            "word": "中",
+            "probability": 0.8442
+          },
+          {
+            "start": 29.72,
+            "end": 29.72,
+            "word": "の",
+            "probability": 0.9873
+          },
+          {
+            "start": 29.72,
+            "end": 29.72,
+            "word": "歌",
+            "probability": 0.9604
+          },
+          {
+            "start": 29.72,
+            "end": 29.72,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.72,
+            "end": 29.72,
+            "word": "中",
+            "probability": 0.9126
+          },
+          {
+            "start": 29.72,
+            "end": 29.72,
+            "word": "の",
+            "probability": 0.9917
+          },
+          {
+            "start": 29.72,
+            "end": 29.72,
+            "word": "歌",
+            "probability": 0.9624
+          },
+          {
+            "start": 29.72,
+            "end": 29.72,
+            "word": "詞",
+            "probability": 0.9993
+          },
+          {
+            "start": 29.72,
+            "end": 29.72,
+            "word": "中",
+            "probability": 0.9419
+          },
+          {
+            "start": 29.72,
+            "end": 29.76,
+            "word": "の",
+            "probability": 0.9932
+          },
+          {
+            "start": 29.76,
+            "end": 29.84,
+            "word": "歌",
+            "probability": 0.9648
+          },
+          {
+            "start": 29.84,
+            "end": 29.84,
+            "word": "詞",
+            "probability": 0.9993
+          },
+          {
+            "start": 29.84,
+            "end": 29.84,
+            "word": "中",
+            "probability": 0.9565
+          },
+          {
+            "start": 29.84,
+            "end": 29.84,
+            "word": "の",
+            "probability": 0.9937
+          },
+          {
+            "start": 29.84,
+            "end": 29.84,
+            "word": "歌",
+            "probability": 0.9668
+          },
+          {
+            "start": 29.84,
+            "end": 29.84,
+            "word": "詞",
+            "probability": 0.9993
+          },
+          {
+            "start": 29.84,
+            "end": 29.84,
+            "word": "中",
+            "probability": 0.9653
+          },
+          {
+            "start": 29.84,
+            "end": 29.84,
+            "word": "の",
+            "probability": 0.9941
+          },
+          {
+            "start": 29.84,
+            "end": 29.84,
+            "word": "歌",
+            "probability": 0.9688
+          },
+          {
+            "start": 29.84,
+            "end": 29.86,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.86,
+            "end": 29.86,
+            "word": "中",
+            "probability": 0.9702
+          },
+          {
+            "start": 29.86,
+            "end": 29.86,
+            "word": "の",
+            "probability": 0.9946
+          },
+          {
+            "start": 29.86,
+            "end": 29.86,
+            "word": "歌",
+            "probability": 0.9697
+          },
+          {
+            "start": 29.86,
+            "end": 29.86,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.86,
+            "end": 29.86,
+            "word": "中",
+            "probability": 0.9736
+          },
+          {
+            "start": 29.86,
+            "end": 29.86,
+            "word": "の",
+            "probability": 0.9946
+          },
+          {
+            "start": 29.86,
+            "end": 29.86,
+            "word": "歌",
+            "probability": 0.9707
+          },
+          {
+            "start": 29.86,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9761
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9946
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9717
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9775
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9946
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9722
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.979
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9946
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9722
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9805
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9951
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9722
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.981
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9951
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9722
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9814
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9951
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9722
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.999
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9819
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9951
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9717
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9824
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9951
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9722
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9834
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9951
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9712
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9834
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9951
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9707
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9839
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9956
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9697
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9844
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9956
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9702
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9849
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9956
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9692
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9858
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9961
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9697
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9863
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9961
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9688
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9985
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9868
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9961
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9692
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9985
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9873
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9966
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9683
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9873
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9966
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9678
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9883
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9966
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9678
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9888
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9966
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9688
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9988
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9888
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9966
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9678
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9985
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9893
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9971
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9688
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9985
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9902
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9971
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9688
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9985
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9902
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9971
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9688
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9983
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9907
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9976
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9692
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.998
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9912
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9976
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9702
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9983
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9917
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9976
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9707
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9983
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9917
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9976
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9712
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9983
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9922
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.9976
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9707
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.998
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9927
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.998
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9707
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.998
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9927
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.998
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9712
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9976
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9927
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.998
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9717
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9978
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "中",
+            "probability": 0.9932
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "の",
+            "probability": 0.998
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "歌",
+            "probability": 0.9722
+          },
+          {
+            "start": 29.98,
+            "end": 29.98,
+            "word": "詞",
+            "probability": 0.9956
+          }
+        ]
+      }
+    ],
+    "elapsed_seconds": 33.8
+  },
+  "lyrics_probe": {
+    "label": "source_lyrics",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v3\\yama-aiwotoku-piano-negative\\source_window.wav",
+    "prompt_contains_expected_lyrics": true,
+    "segment_count": 4,
+    "matched_line_count": 1,
+    "average_match_score": 0.2,
+    "matches": [
+      {
+        "expected": "手放したっていいさ",
+        "detected": "手放したっていいさ",
+        "score": 1.0,
+        "start": 26.8,
+        "end": 29.34,
+        "accepted": true
+      },
+      {
+        "expected": "傷を付け合う運命",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "ぞんざいな日々は",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "手離したっていいさ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "軽薄な言葉も紛れもなく愛だろ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      }
+    ],
+    "segments": [
+      {
+        "start": 0.0,
+        "end": 3.3,
+        "text": "君だけを見てくれたら",
+        "avg_logprob": -0.1531,
+        "no_speech_prob": 0.5762,
+        "words": [
+          {
+            "start": 0.0,
+            "end": 0.0,
+            "word": "君",
+            "probability": 0.0794
+          },
+          {
+            "start": 0.0,
+            "end": 0.42,
+            "word": "だけ",
+            "probability": 0.8994
+          },
+          {
+            "start": 0.42,
+            "end": 0.8,
+            "word": "を",
+            "probability": 0.7515
+          },
+          {
+            "start": 0.8,
+            "end": 1.64,
+            "word": "見て",
+            "probability": 0.7197
+          },
+          {
+            "start": 1.64,
+            "end": 2.34,
+            "word": "く",
+            "probability": 0.999
+          },
+          {
+            "start": 2.34,
+            "end": 2.6,
+            "word": "れた",
+            "probability": 0.9863
+          },
+          {
+            "start": 2.6,
+            "end": 3.3,
+            "word": "ら",
+            "probability": 0.8125
+          }
+        ]
+      },
+      {
+        "start": 5.0,
+        "end": 11.2,
+        "text": "ただ一人 君だけがいてくれたら",
+        "avg_logprob": -0.1531,
+        "no_speech_prob": 0.5762,
+        "words": [
+          {
+            "start": 4.86,
+            "end": 5.44,
+            "word": "ただ",
+            "probability": 0.6333
+          },
+          {
+            "start": 5.44,
+            "end": 6.12,
+            "word": "一",
+            "probability": 0.3955
+          },
+          {
+            "start": 6.12,
+            "end": 6.48,
+            "word": "人",
+            "probability": 0.9985
+          },
+          {
+            "start": 7.0,
+            "end": 7.3,
+            "word": "君",
+            "probability": 0.9731
+          },
+          {
+            "start": 7.3,
+            "end": 7.96,
+            "word": "だけ",
+            "probability": 0.9541
+          },
+          {
+            "start": 7.96,
+            "end": 8.5,
+            "word": "が",
+            "probability": 0.9995
+          },
+          {
+            "start": 8.5,
+            "end": 9.3,
+            "word": "いて",
+            "probability": 0.8867
+          },
+          {
+            "start": 9.3,
+            "end": 9.88,
+            "word": "く",
+            "probability": 0.999
+          },
+          {
+            "start": 9.88,
+            "end": 10.18,
+            "word": "れた",
+            "probability": 0.9785
+          },
+          {
+            "start": 10.18,
+            "end": 11.2,
+            "word": "ら",
+            "probability": 0.998
+          }
+        ]
+      },
+      {
+        "start": 11.2,
+        "end": 14.8,
+        "text": "嗚呼",
+        "avg_logprob": -0.832,
+        "no_speech_prob": 0.1114,
+        "words": [
+          {
+            "start": 11.2,
+            "end": 11.38,
+            "word": "嗚",
+            "probability": 0.5128
+          },
+          {
+            "start": 11.38,
+            "end": 14.8,
+            "word": "呼",
+            "probability": 0.9199
+          }
+        ]
+      },
+      {
+        "start": 26.8,
+        "end": 29.34,
+        "text": "手放したっていいさ",
+        "avg_logprob": -0.832,
+        "no_speech_prob": 0.1114,
+        "words": [
+          {
+            "start": 26.42,
+            "end": 26.96,
+            "word": "手",
+            "probability": 0.481
+          },
+          {
+            "start": 26.96,
+            "end": 27.42,
+            "word": "放",
+            "probability": 0.7988
+          },
+          {
+            "start": 27.42,
+            "end": 27.96,
+            "word": "した",
+            "probability": 0.9307
+          },
+          {
+            "start": 27.96,
+            "end": 28.5,
+            "word": "って",
+            "probability": 0.9932
+          },
+          {
+            "start": 28.5,
+            "end": 29.08,
+            "word": "いい",
+            "probability": 0.8628
+          },
+          {
+            "start": 29.08,
+            "end": 29.34,
+            "word": "さ",
+            "probability": 0.9868
+          }
+        ]
+      }
+    ],
+    "elapsed_seconds": 32.21
+  }
+}

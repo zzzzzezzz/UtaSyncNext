@@ -9,6 +9,9 @@ from typing import Any
 from core.subtitle_policy import wrap_ass_text
 
 
+MICRO_OVERLAP_LIMIT_MS = 20
+
+
 ASS_PRESETS: dict[str, dict[str, Any]] = {
     "默认双语 (纯白+浅灰)": {
         "ch_font": "Microsoft YaHei",
@@ -144,6 +147,11 @@ class ASSMaker:
         blocks = self._parse_srt(Path(self.srt_path))
         if not blocks:
             raise RuntimeError(f"SRT 中没有可用于生成 ASS 的字幕块: {self.srt_path}")
+        blocks, adjusted_overlaps = _trim_micro_overlaps(blocks)
+        if adjusted_overlaps:
+            _safe_log(
+                f"   -> 已消除 {adjusted_overlaps} 处毫秒级字幕重叠，避免播放器把字幕向上避让。"
+            )
 
         events = [self._build_dialogue(block, blocks, index, config) for index, block in enumerate(blocks)]
         content = self._build_header(config) + "\n".join(events) + "\n"
@@ -284,7 +292,10 @@ def _srt_time_to_ms(value: str) -> int:
 
 
 def _srt_time_to_ass(value: str) -> str:
-    total_ms = _srt_time_to_ms(value)
+    return _milliseconds_to_ass(_srt_time_to_ms(value))
+
+
+def _milliseconds_to_ass(total_ms: int) -> str:
     hours = total_ms // 3_600_000
     total_ms %= 3_600_000
     minutes = total_ms // 60_000
@@ -292,6 +303,28 @@ def _srt_time_to_ass(value: str) -> str:
     seconds = total_ms // 1000
     centiseconds = (total_ms % 1000) // 10
     return f"{hours}:{minutes:02d}:{seconds:02d}.{centiseconds:02d}"
+
+
+def _trim_micro_overlaps(blocks: list[SubtitleBlock]) -> tuple[list[SubtitleBlock], int]:
+    adjusted = list(blocks)
+    adjustment_count = 0
+    for index in range(len(adjusted) - 1):
+        current = adjusted[index]
+        following = adjusted[index + 1]
+        overlap_ms = current.end_ms - following.start_ms
+        if not (0 < overlap_ms <= MICRO_OVERLAP_LIMIT_MS):
+            continue
+        if following.start_ms <= current.start_ms:
+            continue
+        adjusted[index] = SubtitleBlock(
+            start_ass=current.start_ass,
+            end_ass=_milliseconds_to_ass(following.start_ms),
+            start_ms=current.start_ms,
+            end_ms=following.start_ms,
+            lines=current.lines,
+        )
+        adjustment_count += 1
+    return adjusted, adjustment_count
 
 
 def _hex_to_ass_color(value: str) -> str:

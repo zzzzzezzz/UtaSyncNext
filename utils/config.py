@@ -9,10 +9,11 @@ from engine.cache_env import app_root
 CONFIG_FILE = app_root() / "user_settings.json"
 
 DEFAULT_SETTINGS: dict[str, Any] = {
+    "ui_variant": "next",
     "media_path": "",
     "cached_lyrics": "",
     "audio_type": "Live 现场演唱 (常规/摇滚)",
-    "hardware_mode": "极限防爆 (4G~6G显存/默认)",
+    "hardware_mode": "自动匹配显存 (推荐)",
     "use_demucs": "先跳过 Demucs (极速/推荐先出轴)",
     "model_size": "large-v2 (战神级/推荐)",
     "output_mode": "中日双语字幕",
@@ -55,12 +56,18 @@ def load_settings() -> dict[str, Any]:
 
 
 def save_settings(settings: dict[str, Any]) -> None:
+    settings = _normalize_settings(dict(settings))
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
     with CONFIG_FILE.open("w", encoding="utf-8") as file:
         json.dump(settings, file, ensure_ascii=False, indent=2)
 
 
 def _normalize_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    raw_settings = dict(settings)
+    settings = DEFAULT_SETTINGS.copy()
+    settings.update(raw_settings)
+    if str(settings.get("ui_variant", "classic")).lower() not in {"classic", "next"}:
+        settings["ui_variant"] = "classic"
     audio_aliases = {
         "Live": "Live 现场演唱 (常规/摇滚)",
         "Live Soft": "Live 现场演唱 (极柔气声/清唱)",
@@ -81,12 +88,21 @@ def _normalize_settings(settings: dict[str, Any]) -> dict[str, Any]:
         "开启分离 (推荐)": "开启 Demucs 人声分离 (高质量/很慢)",
         "开启分离 (Live音乐必选)": "开启 Demucs 人声分离 (高质量/很慢)",
     }
+    hardware_aliases = {
+        "极限防爆 (4G~6G显存/默认)": "自动匹配显存 (推荐)",
+        "均衡提速 (8G显存)": "均衡分离 (8G显存)",
+        "满血狂飙 (12G+显存)": "快速分离 (12G+显存)",
+    }
 
     settings["audio_type"] = audio_aliases.get(str(settings.get("audio_type", "")), settings["audio_type"])
     settings["output_mode"] = output_aliases.get(str(settings.get("output_mode", "")), settings["output_mode"])
+    settings["hardware_mode"] = hardware_aliases.get(
+        str(settings.get("hardware_mode", "")),
+        str(settings.get("hardware_mode") or DEFAULT_SETTINGS["hardware_mode"]),
+    )
 
-    if "use_demucs" not in settings and "demucs_mode" in settings:
-        settings["use_demucs"] = settings["demucs_mode"]
+    if "use_demucs" not in raw_settings and "demucs_mode" in raw_settings:
+        settings["use_demucs"] = raw_settings["demucs_mode"]
     settings["use_demucs"] = demucs_aliases.get(str(settings.get("use_demucs", "")), settings["use_demucs"])
 
     model_aliases = {
@@ -111,5 +127,9 @@ def _normalize_settings(settings: dict[str, Any]) -> dict[str, Any]:
 
     if str(settings.get("visual_api_provider", "")) == "与翻译引擎一致":
         settings["api_preset_design"] = "与翻译引擎一致 (默认)"
+
+    global_proxy = str(settings.get("proxy_url") or settings.get("model_download_proxy") or "").strip()
+    settings["proxy_url"] = global_proxy
+    settings["model_download_proxy"] = global_proxy
 
     return settings

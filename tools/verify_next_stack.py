@@ -88,9 +88,34 @@ def main() -> int:
     _add(results, "pipeline-cache-fingerprint", _check_pipeline_cache_fingerprint)
     _add(results, "pipeline-preview", _check_pipeline_preview)
     _run_script(results, "model-offline", ["tools/verify_model_download.py"])
+    _run_script(results, "instance-lock", ["tools/smoke_instance_lock.py"])
     _run_script(results, "translation-guardrails", ["tools/smoke_translation_guardrails.py"])
     _run_script(results, "subtitle-density", ["tools/smoke_subtitle_density.py"])
+    _run_script(results, "asr-diagnostics", ["tools/smoke_asr_diagnostics.py"])
+    _run_script(results, "opening-lyrics-cleanup", ["tools/smoke_opening_lyrics_cleanup.py"])
+    _run_script(results, "watermark-hallucination-cleanup", ["tools/smoke_watermark_hallucination_cleanup.py"])
+    _run_script(results, "task-recovery", ["tools/smoke_task_recovery.py"])
+    _run_script(results, "production-stability", ["tools/smoke_production_stability.py"])
+    _run_script(results, "subtitle-reviewer", ["tools/smoke_subtitle_reviewer.py"])
+    _run_script(results, "hardware-profile", ["tools/smoke_hardware_profile.py"])
+    _run_script(results, "network-proxy", ["tools/smoke_network_proxy.py"])
+    _run_script(results, "performance-metrics", ["tools/smoke_performance_metrics.py"])
+    _run_script(results, "ffmpeg-preflight", ["tools/smoke_ffmpeg_preflight.py"])
+    _run_script(results, "icon-assets", ["tools/smoke_icon_assets.py"])
+    _run_script(results, "packaging-audit-policy", ["tools/smoke_packaging_audit.py"])
+    _run_script(results, "task-state", ["tools/smoke_task_state.py"])
+    _run_script(results, "lyrics-context", ["tools/smoke_lyrics_context.py"])
+    _run_script(results, "lyric-opening-gap", ["tools/smoke_lyric_gap_detection.py"])
+    _run_script(results, "lyric-gap-repair-preview", ["tools/smoke_lyric_gap_repair.py"])
+    _run_script(results, "lyric-gap-window-rescan", ["tools/smoke_lyric_gap_window_rescan.py"])
+    _run_script(results, "lyric-assisted-alignment-research", ["tools/smoke_lyric_assisted_alignment.py"])
+    _run_script(results, "lyric-alignment-matrix", ["tools/smoke_lyric_alignment_matrix.py"])
     _run_script(results, "regression-workspace", ["tools/smoke_regression_workspace.py"])
+    _run_script(
+        results,
+        "regression-reference-materializer",
+        ["tools/smoke_materialize_regression_reference.py"],
+    )
     if args.profile != "health":
         _run_script(results, "translator-bilingual", ["tools/smoke_translator.py", "--mode", "bilingual"])
         _run_script(results, "translator-chinese-only", ["tools/smoke_translator.py", "--mode", "chinese_only"])
@@ -441,10 +466,16 @@ def _check_translation_model_policy() -> str:
 
 def _check_pipeline_cache_fingerprint() -> str:
     from engine.pipeline_worker import (
+        WhisperModelRef,
+        _asr_cache_reason,
+        _build_asr_cache_hash,
+        _build_legacy_asr_cache_hash,
         _file_content_hash,
         _hash_payload,
         _invalidate_translation_completion,
         _media_fingerprint,
+        _translation_completion_cache_hit,
+        _translation_output_path,
         _try_reuse_asr,
     )
 
@@ -473,11 +504,65 @@ def _check_pipeline_cache_fingerprint() -> str:
         if len({asr_a, asr_b, asr_c}) != 3:
             raise AssertionError("ASR cache hash should include media and model snapshot")
 
+        model_ref = WhisperModelRef("large-v2", root / "model-snapshot", "fixture")
+        cleanup_without_lyrics = _build_asr_cache_hash(
+            media_fingerprint=second_media,
+            audio_type="live",
+            model_size="large-v2",
+            model_ref=model_ref,
+            skip_demucs=True,
+            hardware_mode="low",
+            reference_lyrics="",
+        )
+        cleanup_with_lyrics = _build_asr_cache_hash(
+            media_fingerprint=second_media,
+            audio_type="live",
+            model_size="large-v2",
+            model_ref=model_ref,
+            skip_demucs=True,
+            hardware_mode="low",
+            reference_lyrics="Sample Song - Artist\n可信歌词锚点",
+        )
+        if cleanup_without_lyrics != cleanup_with_lyrics:
+            raise AssertionError("reference lyric edits must not invalidate the ASR cache")
+
+        legacy_hash = _build_legacy_asr_cache_hash(
+            media_fingerprint=second_media,
+            audio_type="live",
+            model_size="large-v2",
+            model_ref=model_ref,
+            skip_demucs=True,
+            hardware_mode="low",
+            reference_lyrics="Sample Song - Artist\n可信歌词锚点",
+        )
+        hash_path.write_text(legacy_hash, encoding="utf-8")
+        if not _try_reuse_asr(
+            srt,
+            hash_path,
+            cleanup_with_lyrics,
+            legacy_hashes=(legacy_hash,),
+        ):
+            raise AssertionError("legacy ASR cache should be reusable and upgraded")
+        if hash_path.read_text(encoding="utf-8") != cleanup_with_lyrics:
+            raise AssertionError("legacy ASR cache marker should be upgraded after reuse")
+
         hash_path.write_text(asr_b, encoding="utf-8")
         if not _try_reuse_asr(srt, hash_path, asr_b):
             raise AssertionError("ASR cache should be reusable when SRT and hash both match")
         if _try_reuse_asr(srt, hash_path, asr_c):
             raise AssertionError("ASR cache should not be reused when hash differs")
+        if _asr_cache_reason(srt, hash_path, asr_b):
+            raise AssertionError("matching ASR cache should not report a miss reason")
+        if "媒体、模型" not in _asr_cache_reason(srt, hash_path, asr_c):
+            raise AssertionError("changed ASR fingerprint should explain that inputs or rules changed")
+
+        hash_path.unlink()
+        if "完整打轴标记" not in _asr_cache_reason(srt, hash_path, asr_b):
+            raise AssertionError("missing ASR marker should have a specific cache reason")
+
+        srt.unlink()
+        if "没有历史打轴字幕" not in _asr_cache_reason(srt, hash_path, asr_b):
+            raise AssertionError("missing source SRT should have a specific cache reason")
 
         translation_cache = root / "translation-cache.json"
         translation_marker = root / "translation.hash"
@@ -490,7 +575,23 @@ def _check_pipeline_cache_fingerprint() -> str:
         if not translation_cache.exists():
             raise AssertionError("partial batch cache must survive so failed translation can resume")
 
-    return "media/model/SRT changes invalidate completion markers while partial translation batches survive"
+        translated_srt = _translation_output_path(srt, "bilingual")
+        translated_srt.write_text(
+            "1\n00:00:00,000 --> 00:00:01,000\nこんにちは\n你好\n",
+            encoding="utf-8",
+        )
+        translation_marker.write_text("complete-run", encoding="utf-8")
+        if not _translation_completion_cache_hit(
+            translation_marker,
+            "complete-run",
+            translated_srt,
+        ):
+            raise AssertionError("complete translation cache should require both marker and translated SRT")
+        translated_srt.unlink()
+        if _translation_completion_cache_hit(translation_marker, "complete-run", translated_srt):
+            raise AssertionError("missing translated SRT must not be treated as a complete cache hit")
+
+    return "completion markers require real outputs while partial translation batches survive invalidation"
 
 
 def _check_pipeline_preview() -> str:

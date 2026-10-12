@@ -72,7 +72,11 @@ def is_complete_snapshot(snapshot: Path) -> bool:
 def _matches_model(cache_name: str, model_name: str) -> bool:
     name = cache_name.lower()
     aliases = {
-        "large-v3-turbo": ["large-v3-turbo", "faster-whisper-large-v3-turbo"],
+        "large-v3-turbo": [
+            "large-v3-turbo",
+            "faster-whisper-large-v3-turbo",
+            "faster-whisper-large-v3-turbo-ct2",
+        ],
         "large-v3": ["large-v3", "faster-whisper-large-v3"],
         "large-v2": ["large-v2", "faster-whisper-large-v2"],
         "medium": ["medium", "faster-whisper-medium"],

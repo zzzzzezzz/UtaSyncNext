@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "phase": "interrupt",
+  "checks": {
+    "before_close": {
+      "status": "🌍 正在调用大模型翻译...",
+      "run_button": "⏹ 取消任务 · 正在调用大模型翻译...",
+      "console_has_cache_hit": true
+    },
+    "worker_stopped": true,
+    "cancel_created_error_log": false,
+    "source_srt_hash_unchanged": true,
+    "source_srt_mtime_unchanged": true,
+    "media_path_saved_for_restart": true
+  },
+  "source_srt_sha256": "6689259b76eaf5f6014e02c93a388b0dfb80a1b2dca71b53ff5aeb54368b2e94"
+}

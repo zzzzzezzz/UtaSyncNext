@@ -27,6 +27,7 @@ HEAVY_NAMES = {
 }
 HEAVY_SUFFIXES = {".bin", ".pt", ".pth", ".safetensors", ".ckpt", ".onnx"}
 WARN_SIZE_MB = 180
+EXTERNAL_RUNTIME_NAMES = {".engine", "models_faster", "output", ".cache", "performance", "fonts", "user_settings.json"}
 
 
 @dataclass
@@ -86,14 +87,22 @@ def audit_dist(dist: Path) -> AuditResult:
     external_links: list[Path] = []
 
     for path in _iter_dist_paths(dist):
+        try:
+            relative = path.relative_to(dist)
+        except ValueError:
+            relative = Path()
+        # package_launcher.ps1 deliberately restores user/runtime state after
+        # building so a local packaged run can resume. Those roots are not
+        # part of the launcher payload and must not make the audit fail.
+        if relative.parts and relative.parts[0].lower() in EXTERNAL_RUNTIME_NAMES:
+            if len(relative.parts) == 1 and _is_reparse_point(path):
+                external_links.append(path)
+            continue
         name = path.name.lower()
         if _is_reparse_point(path):
             if name in HEAVY_NAMES:
                 external_links.append(path)
             continue
-
-        if any(part.lower() in HEAVY_NAMES for part in path.parts):
-            heavy_hits.append(path)
 
         if path.is_file():
             file_count += 1
@@ -101,6 +110,8 @@ def audit_dist(dist: Path) -> AuditResult:
                 total += path.stat().st_size
             except OSError:
                 pass
+            if any(part.lower() in HEAVY_NAMES for part in path.parts):
+                heavy_hits.append(path)
             if path.suffix.lower() in HEAVY_SUFFIXES:
                 heavy_hits.append(path)
 

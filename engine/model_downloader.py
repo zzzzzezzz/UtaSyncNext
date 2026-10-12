@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import os
-import re
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
+from io import TextIOBase
 from pathlib import Path
 from typing import Callable, Iterator
 
 from engine.cache_env import apply_next_cache_env
 from engine.model_registry import find_complete_snapshot, next_models_root
+from utils.network_proxy import ProxyConfigError, normalize_proxy_url
 
 
 SOURCE_OFFICIAL = "HuggingFace 官方源"
@@ -25,7 +26,9 @@ MODEL_SOURCES = {
 MODEL_REPOS = {
     "large-v2": "Systran/faster-whisper-large-v2",
     "large-v3": "Systran/faster-whisper-large-v3",
-    "large-v3-turbo": "Systran/faster-whisper-large-v3-turbo",
+    # Systran does not publish a repository with this name. This is the
+    # public CTranslate2 conversion used for faster-whisper turbo.
+    "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo-ct2",
     "medium": "Systran/faster-whisper-medium",
     "small": "Systran/faster-whisper-small",
     "base": "Systran/faster-whisper-base",
@@ -161,19 +164,10 @@ def _resolve_endpoint(source_name: str, custom_endpoint: str) -> str | None:
 
 
 def _normalize_proxy_url(proxy_url: str) -> str | None:
-    proxy = proxy_url.strip().rstrip("/")
-    if not proxy:
-        return None
-    if re.fullmatch(r"\d{1,5}", proxy):
-        port = int(proxy)
-        if not 1 <= port <= 65535:
-            raise ModelDownloadError("代理端口必须在 1-65535 之间。")
-        return f"http://127.0.0.1:{port}"
-    if "://" not in proxy:
-        proxy = f"http://{proxy}"
-    if not proxy.startswith(("http://", "https://", "socks5://", "socks5h://")):
-        raise ModelDownloadError("代理地址必须以 http://、https://、socks5:// 或 socks5h:// 开头。")
-    return proxy
+    try:
+        return normalize_proxy_url(proxy_url) or None
+    except ProxyConfigError as exc:
+        raise ModelDownloadError(str(exc)) from exc
 
 
 def _missing_huggingface_hub_message(action: str) -> str:
@@ -224,10 +218,20 @@ def _temporary_proxy_env(proxy_url: str | None) -> Iterator[None]:
     # Keep large model payloads inside the configured HuggingFace cache_dir.
     # hf-xet may stage chunks in the user-level cache first, which makes our
     # Next-local progress monitor look frozen.
-    keys.append("HF_HUB_DISABLE_XET")
+    keys.extend(("HF_HUB_DISABLE_XET", "HF_HUB_DISABLE_PROGRESS_BARS"))
     previous = {key: os.environ.get(key) for key in keys}
+    previous_stdout = sys.stdout
+    previous_stderr = sys.stderr
     try:
         apply_next_cache_env()
+        # PyInstaller's windowed bootloader sets stdout/stderr to None. The
+        # Hub's tqdm/file-download path writes to stderr even when its UI is
+        # hidden, which otherwise surfaces as: NoneType has no attribute write.
+        os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+        if sys.stdout is None:
+            sys.stdout = _NullWriter()
+        if sys.stderr is None:
+            sys.stderr = _NullWriter()
         if proxy_url:
             for key in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"]:
                 os.environ[key] = proxy_url
@@ -238,6 +242,8 @@ def _temporary_proxy_env(proxy_url: str | None) -> Iterator[None]:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+        sys.stdout = previous_stdout
+        sys.stderr = previous_stderr
 
 
 def _dry_run_file_size(item: object) -> int | None:
@@ -246,3 +252,13 @@ def _dry_run_file_size(item: object) -> int | None:
         if isinstance(value, int):
             return value
     return None
+
+
+class _NullWriter(TextIOBase):
+    """File-like sink for windowed/frozen processes without console streams."""
+
+    def write(self, text: str) -> int:
+        return len(text or "")
+
+    def flush(self) -> None:
+        return None

@@ -24,7 +24,21 @@ def target_cache_dir_name(source_path: Path, model_name: str) -> str:
 
 
 def model_download_size(model_root: Path, model_name: str) -> int:
-    return folder_size(model_cache_root(model_root, model_name)) + folder_size(model_lock_root(model_root, model_name))
+    total = 0
+    lock_root = model_lock_root(model_root, model_name)
+    if lock_root.exists():
+        for child in lock_root.iterdir():
+            if child.is_dir() and _cache_dir_matches(child.name, model_name):
+                total += folder_size(child)
+    if not model_root.exists():
+        return total
+    # The turbo repository is not under the Systran namespace. Count every
+    # matching Hub cache directory so the progress monitor follows the actual
+    # payload instead of remaining at the 40-byte refs file.
+    for child in model_root.iterdir():
+        if child.is_dir() and _cache_dir_matches(child.name, model_name):
+            total += folder_size(child)
+    return total
 
 
 def folder_size(root: Path) -> int:
@@ -45,7 +59,18 @@ def model_cache_root(model_root: Path, model_name: str) -> Path:
 
 
 def model_lock_root(model_root: Path, model_name: str) -> Path:
-    return model_root / ".locks" / f"models--Systran--faster-whisper-{model_name}"
+    return model_root / ".locks"
+
+
+def _cache_dir_matches(cache_name: str, model_name: str) -> bool:
+    normalized = cache_name.lower().replace("models--", "")
+    aliases = {
+        "large-v3-turbo": ("large-v3-turbo", "large-v3-turbo-ct2"),
+    }.get(model_name, (model_name,))
+    return any(
+        normalized.endswith(alias) or normalized.endswith(f"faster-whisper-{alias}")
+        for alias in aliases
+    )
 
 
 def format_bytes(value: int | None) -> str:
@@ -100,6 +125,16 @@ def persist_model_proxy(parent, proxy_url: str) -> None:
     if not isinstance(settings, dict):
         return
     settings["model_download_proxy"] = proxy_url
+    settings["proxy_url"] = proxy_url
+    sidebar = getattr(parent, "sidebar", None)
+    api_panel = getattr(sidebar, "api_settings_panel", None)
+    proxy_entry = getattr(api_panel, "proxy_entry", None)
+    if proxy_entry is not None:
+        try:
+            proxy_entry.delete(0, "end")
+            proxy_entry.insert(0, proxy_url)
+        except Exception:
+            pass
     try:
         save_settings(settings)
     except Exception:

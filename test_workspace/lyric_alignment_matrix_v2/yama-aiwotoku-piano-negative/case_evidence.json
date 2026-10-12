@@ -1,0 +1,377 @@
+{
+  "id": "yama-aiwotoku-piano-negative",
+  "description": "A piano-only interlude must not become a complete prompted chorus.",
+  "status": "PASS",
+  "elapsed_seconds": 157.64,
+  "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\research-aiwotoku-piano-12m30s-13m45s\\audio\\9990ffa1_源音频.wav",
+  "window": {
+    "start": 0.0,
+    "end": 30.0
+  },
+  "expected_lines": [
+    "手放したっていいさ",
+    "傷を付け合う運命",
+    "ぞんざいな日々は",
+    "手離したっていいさ",
+    "軽薄な言葉も紛れもなく愛だろ"
+  ],
+  "source_srt": "",
+  "source_srt_sha256_before": "",
+  "source_srt_sha256_after": "",
+  "preview_written": false,
+  "preview_path": "",
+  "full_preview_written": false,
+  "full_preview_path": "",
+  "full_preview_rejection_reason": "strict_alignment_preview_not_available",
+  "blocking_source_cue": null,
+  "replaced_source_cues": [],
+  "expectations": {
+    "maximum_lyrics_matches": 2,
+    "expect_preview_written": false,
+    "expect_full_preview_written": false,
+    "expect_source_unchanged": true
+  },
+  "evaluation": {
+    "passed": true,
+    "failures": []
+  },
+  "generic_probe": {
+    "label": "source_generic",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v2\\yama-aiwotoku-piano-negative\\source_window.wav",
+    "prompt_contains_expected_lyrics": false,
+    "segment_count": 0,
+    "matched_line_count": 0,
+    "average_match_score": 0.0,
+    "matches": [
+      {
+        "expected": "手放したっていいさ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "傷を付け合う運命",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "ぞんざいな日々は",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "手離したっていいさ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "軽薄な言葉も紛れもなく愛だろ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      }
+    ],
+    "segments": [],
+    "elapsed_seconds": 67.29
+  },
+  "lyrics_probe": {
+    "label": "source_lyrics",
+    "audio": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\lyric_alignment_matrix_v2\\yama-aiwotoku-piano-negative\\source_window.wav",
+    "prompt_contains_expected_lyrics": true,
+    "segment_count": 4,
+    "matched_line_count": 1,
+    "average_match_score": 0.2,
+    "matches": [
+      {
+        "expected": "手放したっていいさ",
+        "detected": "手放したっていいさ",
+        "score": 1.0,
+        "start": 25.12,
+        "end": 29.34,
+        "accepted": true
+      },
+      {
+        "expected": "傷を付け合う運命",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "ぞんざいな日々は",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "手離したっていいさ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      },
+      {
+        "expected": "軽薄な言葉も紛れもなく愛だろ",
+        "detected": "",
+        "score": 0.0,
+        "start": null,
+        "end": null,
+        "accepted": false
+      }
+    ],
+    "segments": [
+      {
+        "start": 0.0,
+        "end": 0.44,
+        "text": "始めっちゃいけないんだろう",
+        "avg_logprob": -2.3872,
+        "no_speech_prob": 0.5762,
+        "words": [
+          {
+            "start": 0.0,
+            "end": 0.44,
+            "word": "始",
+            "probability": 0.0002
+          },
+          {
+            "start": 0.44,
+            "end": 0.44,
+            "word": "め",
+            "probability": 0.1035
+          },
+          {
+            "start": 0.44,
+            "end": 0.44,
+            "word": "っちゃ",
+            "probability": 0.0003
+          },
+          {
+            "start": 0.44,
+            "end": 0.44,
+            "word": "い",
+            "probability": 0.1045
+          },
+          {
+            "start": 0.44,
+            "end": 0.44,
+            "word": "け",
+            "probability": 0.8887
+          },
+          {
+            "start": 0.44,
+            "end": 0.44,
+            "word": "ない",
+            "probability": 0.8799
+          },
+          {
+            "start": 0.44,
+            "end": 0.44,
+            "word": "んだ",
+            "probability": 0.0517
+          },
+          {
+            "start": 0.44,
+            "end": 0.44,
+            "word": "ろう",
+            "probability": 0.0181
+          }
+        ]
+      },
+      {
+        "start": 0.44,
+        "end": 3.3,
+        "text": "君だけをいてくれたら",
+        "avg_logprob": -2.3872,
+        "no_speech_prob": 0.5762,
+        "words": [
+          {
+            "start": 0.44,
+            "end": 0.44,
+            "word": "君",
+            "probability": 0.0975
+          },
+          {
+            "start": 0.44,
+            "end": 0.44,
+            "word": "だけ",
+            "probability": 0.3823
+          },
+          {
+            "start": 0.44,
+            "end": 0.8,
+            "word": "を",
+            "probability": 0.7388
+          },
+          {
+            "start": 0.8,
+            "end": 1.54,
+            "word": "い",
+            "probability": 0.0031
+          },
+          {
+            "start": 1.54,
+            "end": 1.98,
+            "word": "て",
+            "probability": 0.6655
+          },
+          {
+            "start": 1.98,
+            "end": 2.32,
+            "word": "く",
+            "probability": 0.9976
+          },
+          {
+            "start": 2.32,
+            "end": 2.6,
+            "word": "れた",
+            "probability": 0.7876
+          },
+          {
+            "start": 2.6,
+            "end": 3.3,
+            "word": "ら",
+            "probability": 0.5405
+          }
+        ]
+      },
+      {
+        "start": 3.3,
+        "end": 11.18,
+        "text": "ただひとり 君だけがいてくれたら",
+        "avg_logprob": -0.4185,
+        "no_speech_prob": 0.0468,
+        "words": [
+          {
+            "start": 3.3,
+            "end": 5.52,
+            "word": "ただ",
+            "probability": 0.5537
+          },
+          {
+            "start": 5.52,
+            "end": 6.1,
+            "word": "ひ",
+            "probability": 0.4705
+          },
+          {
+            "start": 6.1,
+            "end": 6.22,
+            "word": "と",
+            "probability": 0.9634
+          },
+          {
+            "start": 6.22,
+            "end": 6.56,
+            "word": "り",
+            "probability": 1.0
+          },
+          {
+            "start": 7.0,
+            "end": 7.32,
+            "word": "君",
+            "probability": 0.8711
+          },
+          {
+            "start": 7.32,
+            "end": 7.96,
+            "word": "だけ",
+            "probability": 0.9482
+          },
+          {
+            "start": 7.96,
+            "end": 8.56,
+            "word": "が",
+            "probability": 0.999
+          },
+          {
+            "start": 8.56,
+            "end": 9.3,
+            "word": "いて",
+            "probability": 0.8667
+          },
+          {
+            "start": 9.3,
+            "end": 9.88,
+            "word": "く",
+            "probability": 0.999
+          },
+          {
+            "start": 9.88,
+            "end": 10.18,
+            "word": "れた",
+            "probability": 0.9351
+          },
+          {
+            "start": 10.18,
+            "end": 11.18,
+            "word": "ら",
+            "probability": 0.9985
+          }
+        ]
+      },
+      {
+        "start": 25.12,
+        "end": 29.34,
+        "text": "手放したっていいさ",
+        "avg_logprob": -0.4185,
+        "no_speech_prob": 0.0468,
+        "words": [
+          {
+            "start": 25.12,
+            "end": 26.28,
+            "word": "手",
+            "probability": 0.5757
+          },
+          {
+            "start": 26.28,
+            "end": 27.44,
+            "word": "放",
+            "probability": 0.8389
+          },
+          {
+            "start": 27.44,
+            "end": 27.98,
+            "word": "した",
+            "probability": 0.9644
+          },
+          {
+            "start": 27.98,
+            "end": 28.48,
+            "word": "って",
+            "probability": 0.9878
+          },
+          {
+            "start": 28.48,
+            "end": 29.08,
+            "word": "いい",
+            "probability": 0.9424
+          },
+          {
+            "start": 29.08,
+            "end": 29.34,
+            "word": "さ",
+            "probability": 0.9927
+          }
+        ]
+      }
+    ],
+    "elapsed_seconds": 90.36
+  }
+}

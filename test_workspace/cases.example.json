@@ -29,13 +29,37 @@
         "长句在目标画幅内可读",
         "翻译达到可人工精修的程度"
       ],
+      "review_points": ["00:00:30 代表性复听点"],
+      "known_risks": ["自动指标通过不代表翻译正确"],
       "human_review": {
         "verdict": "未确认",
         "notes": "自动指标通过不代表翻译质量通过"
       },
+      "automatic_checks": {
+        "source": {
+          "required": true,
+          "min_cue_count": 1,
+          "max_overlaps": 0,
+          "max_non_monotonic": 0
+        },
+        "translated": {
+          "required": true,
+          "max_overlaps": 0,
+          "max_single_line_cues": 0
+        },
+        "timeline": {
+          "required": true,
+          "min_positional_match_ratio": 1.0,
+          "max_absolute_cue_delta": 0
+        },
+        "forbidden_text": {
+          "translated": ["明确不应出现的异常文本"]
+        }
+      },
       "references": [
         {
           "level": "v3_auto",
+          "source_time_offset_seconds": 0,
           "source_srt": "D:/v3/example_极致打轴.srt",
           "translated_srt": "D:/v3/example_极致打轴_双语字幕.srt"
         }

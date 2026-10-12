@@ -1,0 +1,73 @@
+{
+  "status": "passed",
+  "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\runs\\ui-burn-flow-v3\\input\\ui-radio-flow-ui-burn-flow-v3.mp4",
+  "staged_media": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\ui_burn_fresh_20260918\\input\\ui-radio-flow-ui_burn_fresh_20260918.mp4",
+  "ass": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-radio-flow-ui-burn-flow-v3\\subtitles\\ui-radio-flow-ui-burn-flow-v3_双语字幕_顶级特效.ass",
+  "staged_ass": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-radio-flow-ui_burn_fresh_20260918\\subtitles\\ui-radio-flow-ui_burn_fresh_20260918_双语字幕_顶级特效.ass",
+  "checks": {
+    "idle_start_button_clear": true,
+    "existing_ass_discovered": true,
+    "existing_srt_discovered": true,
+    "running_state": {
+      "system_status": "视频压制中",
+      "output_text": "正在生成硬字幕视频，校验完成后才会显示正式成品。",
+      "engine_button_state": "disabled",
+      "burn_button_text": "取消视频压制"
+    },
+    "cancel_flow": {
+      "system_status": "空闲",
+      "burn_button_text": "启动底层物理压制 (硬字幕)",
+      "temporary_files_remaining": []
+    },
+    "success_flow": {
+      "video": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-radio-flow-ui_burn_fresh_20260918\\ui-radio-flow-ui_burn_fresh_20260918_硬字幕成品.mp4",
+      "system_status": "空闲",
+      "output_text": "SRT: ui-radio-flow-ui_burn_fresh_20260918_双语字幕.srt  |  ASS: ui-radio-flow-ui_burn_fresh_20260918_双语字幕_顶级特效.ass  |  成品: ui-radio-flow-ui_burn_fresh_20260918_硬字幕成品.mp4",
+      "open_output_state": "normal",
+      "copy_ass_state": "normal"
+    },
+    "output_actions": {
+      "opened_directory": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-radio-flow-ui_burn_fresh_20260918",
+      "clipboard_ass": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-radio-flow-ui_burn_fresh_20260918\\subtitles\\ui-radio-flow-ui_burn_fresh_20260918_双语字幕_顶级特效.ass"
+    },
+    "error_flow": {
+      "log": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-radio-flow-ui_burn_fresh_20260918\\logs\\utasyncnext_burn_error_20260918_144158.txt",
+      "copy_log_state": "normal",
+      "system_status": "空闲"
+    },
+    "dialogs": [
+      {
+        "kind": "askyesno",
+        "title": "启动硬字幕压制",
+        "message": "将使用 FFmpeg 把 ASS 特效字幕永久压入视频画面。\n\n输出模式：MP4 + AAC\n字幕：ui-radio-flow-ui_burn_fresh_20260918_双语字幕_顶级特效.ass\n\n压制会占用一定 CPU/GPU，但已使用低优先级子进程。\n是否开始？"
+      },
+      {
+        "kind": "askyesno",
+        "title": "正在压制",
+        "message": "当前已有视频压制任务正在运行，是否请求取消？"
+      },
+      {
+        "kind": "askyesno",
+        "title": "启动硬字幕压制",
+        "message": "将使用 FFmpeg 把 ASS 特效字幕永久压入视频画面。\n\n输出模式：MP4 + AAC\n字幕：ui-radio-flow-ui_burn_fresh_20260918_双语字幕_顶级特效.ass\n\n压制会占用一定 CPU/GPU，但已使用低优先级子进程。\n是否开始？"
+      },
+      {
+        "kind": "showinfo",
+        "title": "压制完成",
+        "message": "硬字幕视频已生成：\n\nui-radio-flow-ui_burn_fresh_20260918_硬字幕成品.mp4\n\n位置：<Next>\\output\\ui-radio-flow-ui_burn_fresh_20260918"
+      },
+      {
+        "kind": "askyesno",
+        "title": "启动硬字幕压制",
+        "message": "将使用 FFmpeg 把 ASS 特效字幕永久压入视频画面。\n\n输出模式：MP4 + AAC\n字幕：ui-radio-flow-ui_burn_fresh_20260918_双语字幕_顶级特效.ass\n\n压制会占用一定 CPU/GPU，但已使用低优先级子进程。\n是否开始？"
+      },
+      {
+        "kind": "showerror",
+        "title": "压制失败",
+        "message": "界面回归模拟错误：无法写入视频"
+      }
+    ],
+    "settings_restored": true
+  },
+  "output_root": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-radio-flow-ui_burn_fresh_20260918"
+}

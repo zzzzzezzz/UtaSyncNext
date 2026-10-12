@@ -1,0 +1,170 @@
+{
+  "status": "passed",
+  "media": "E:\\traecode\\UtaSync\\UtaSyncNext\\test_workspace\\ui_translation_resume_fresh_20260918\\input\\ui-translation-resume-48.wav",
+  "endpoint_scope": "127.0.0.1 only",
+  "external_api_requests": 0,
+  "phases": {
+    "interrupt": {
+      "status": "passed",
+      "phase": "interrupt",
+      "checks": {
+        "before_close": {
+          "status": "AI 语境翻译中... 25%",
+          "run_button": "⏹ 取消任务 · 翻译：进度 25%",
+          "clear_cache_state": "disabled",
+          "cache_entries": 1,
+          "console_mentions_batches": false
+        },
+        "close_requested_at": 189435.25,
+        "worker_stopped": true,
+        "cancel_created_error_log": false,
+        "partial_cache_entries": 1,
+        "no_false_completed_srt": true,
+        "no_completion_fingerprint": true,
+        "safe_close_elapsed_seconds": 2.42
+      },
+      "process_returncode": 0,
+      "stdout": "PASS: translation interrupted after one cached batch.",
+      "stderr": ""
+    },
+    "resume": {
+      "status": "passed",
+      "phase": "resume",
+      "checks": {
+        "completed_state": {
+          "elapsed_seconds": 8.42,
+          "run_button": "⚡ 启 动 引 擎",
+          "system_status": "空闲",
+          "clear_cache_state": "normal",
+          "output_text": "SRT: ui-translation-resume-48_极致打轴_双语字幕.srt  |  日志: utasyncnext_performance_20260918_143929.txt",
+          "srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-translation-resume-48\\subtitles\\ui-translation-resume-48_极致打轴_双语字幕.srt",
+          "console": "\n输出：已更新输出目录：E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-translation-resume-48\\subtitles\n\n任务：开始前检查\n媒体：ui-translation-resume-48.wav\n打轴：模型 small\n人声分离：本次跳过，优先快速打轴。\n硬件: NVIDIA GeForce GTX 1660 SUPER · 6.0GB；Whisper 会优先尝试 CUDA，失败时自动回退 CPU。\n翻译：将校验已保存断点，只请求未命中的批次。\n翻译：模型 local/translation-resume-test\n网络: 直连或系统代理。\n字幕：仅生成 SRT。\n缓存：已有可复用打轴结果，本次会跳过重新识别。\n⏩ 翻译断点: 检测到 1 个已保存批次；启动后会校验，匹配的批次直接复用。\n\n系统：已启动独立处理进程。\n系统：拖拽导入已启用，可直接拖入媒体或歌词文件。\n\n\n任务：开始处理：ui-translation-resume-48.wav\n任务：本次处理参数\n音频：模式 Live 常规/摇滚\n打轴：模型 small\n性能：策略 本次跳过人声分离，不使用 Demucs 显存档位\n人声分离：本次跳过，直接识别原音频。\n字幕：输出模式 中日双语字幕\n硬件：NVIDIA GeForce GTX 1660 SUPER · 6.0GB；Whisper 会优先尝试 CUDA，失败时自动回退 CPU。\n缓存：上次打轴已完整保存，本次跳过重新识别并继续后续处理。\n基础复听检查： 基础检查发现 48 条字幕建议人工复听；缓存没有原始识别置信度，系统没有自动删除任何内容。\n00:00:00  翻訳再開テスト原文1（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:01  翻訳再開テスト原文2（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:02  翻訳再開テスト原文3（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:03  翻訳再開テスト原文4（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:03  翻訳再開テスト原文5（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n00:00:04  翻訳再開テスト原文6（与相邻字幕高度相似，可能是重复或幻觉，建议复听）\n其余 42 条请查看诊断文件。\n复听检查：诊断文件已保存：ui-translation-resume-48_极致打轴_识别诊断.json\n已加载翻译断点库，共 1 条历史记录；本次只复用内容匹配的记录。\n网络：翻译请求使用直连或系统代理。\n\n翻译：启动大模型翻译。\n翻译：未提供参考歌词，本次使用盲翻。\n本次翻译模型: local/translation-resume-test\n翻译：开始处理，共 4 批，并发 2。\n本次复用 local/translation-resume-test 的翻译缓存。\n调用记录已保存: E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-translation-resume-48\\subtitles\\ui-translation-resume-48_极致打轴_api_trace.json\n翻译：进度 25%\n翻译：进度 50%\n翻译：进度 75%\n翻译：进度 100%\n翻译：完成，用时 1 秒。\n字幕：翻译字幕已保存：ui-translation-resume-48_极致打轴_双语字幕.srt\n性能：打轴阶段耗时：<Next>\\output\\ui-translation-resume-48\\logs\\utasyncnext_performance_20260918_143929.txt\n\n输出：已更新输出目录：E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-translation-resume-48\\subtitles\n\n任务：本次处理总览\n打轴：复用已有字幕结果，未重新识别。\n基础复听提醒：从缓存字幕中发现 48 条文本可能需要确认，详情见 ui-translation-resume-48_极致打轴_识别诊断.json；缓存没有保留原始识别置信度，系统没有自动删除任何字幕。\n人声分离：已跳过，直接识别原音频。\n翻译：使用 local/translation-resume-test，耗时 1 秒，共 4 批，缓存命中 1 批，接口请求 3 次。\n字幕：输出模式为中日双语字幕，未生成 ASS。\n总耗时：4 秒。\n任务：处理完成。\n\n"
+        },
+        "summary": {
+          "media_name": "ui-translation-resume-48.wav",
+          "asr_model": "small",
+          "audio_type": "live",
+          "hardware_mode": "low",
+          "hardware_mode_source": "手动选择",
+          "hardware_gpu_name": "NVIDIA GeForce GTX 1660 SUPER",
+          "hardware_gpu_memory_mb": 6144,
+          "demucs_skipped": true,
+          "output_mode": "bilingual",
+          "translation_requested": true,
+          "api_model": "local/translation-resume-test",
+          "ass_enabled": false,
+          "asr_cache_hit": true,
+          "asr_cache_reason": "已命中，直接复用完整打轴结果",
+          "audio_cache_hit": false,
+          "asr_backend": "cache",
+          "asr_elapsed_seconds": 0,
+          "translation_elapsed_seconds": 1,
+          "audio_extract_elapsed_seconds": 0.0,
+          "demucs_elapsed_seconds": 0.0,
+          "model_load_elapsed_seconds": 0.0,
+          "transcription_elapsed_seconds": 0.0,
+          "ass_elapsed_seconds": 0.0,
+          "translation_batches": 4,
+          "translation_cache_hits": 1,
+          "translation_api_calls": 3,
+          "translation_failed_batches": 0,
+          "translation_alignment_fallbacks": 0,
+          "translation_bilingual_coverage_retries": 0,
+          "translation_speaker_label_warnings": 0,
+          "translation_speaker_labels_removed": 0,
+          "translation_lyric_alignment_warnings": 0,
+          "translation_model": "local/translation-resume-test",
+          "translation_returned_models": [
+            "local/translation-resume-test"
+          ],
+          "ass_generated": false,
+          "cuda_fallback_used": false,
+          "asr_diagnostics_level": "basic",
+          "asr_opening_cleanup_count": 0,
+          "asr_opening_cleanup_anchor": "",
+          "asr_lyric_gap_candidates": 0,
+          "asr_lyric_gap_report_path": "",
+          "asr_lyric_gap_repaired_candidates": 0,
+          "asr_lyric_gap_partially_repaired_candidates": 0,
+          "asr_lyric_gap_inserted_cues": 0,
+          "asr_lyric_gap_partial_inserted_cues": 0,
+          "asr_lyric_gap_repair_evidence_path": "",
+          "asr_lyric_gap_preview_candidates": 0,
+          "asr_lyric_gap_preview_inserted_cues": 0,
+          "asr_lyric_gap_preview_path": "",
+          "asr_lyric_gap_preview_evidence_path": "",
+          "asr_watermark_cleanup_count": 0,
+          "asr_extreme_duration_caps": 0,
+          "layout_profile": "wide_16_9",
+          "layout_note": "16:9 宽屏安全区",
+          "network_mode": "直连或系统代理",
+          "asr_review_candidates": 48,
+          "asr_diagnostics_path": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-translation-resume-48\\subtitles\\ui-translation-resume-48_极致打轴_识别诊断.json",
+          "translation_lyric_gap_warnings": 0,
+          "total_elapsed_seconds": 4.655
+        },
+        "final_cache_entries": 4,
+        "bilingual_timeline_count": 48
+      },
+      "process_returncode": 0,
+      "stdout": "PASS: restart reused one batch and requested only the remaining three.",
+      "stderr": ""
+    }
+  },
+  "local_api_requests": [
+    {
+      "request_id": 1,
+      "mode": "interrupt",
+      "batch": 1,
+      "received": true,
+      "responded": true,
+      "delivered": true
+    },
+    {
+      "request_id": 2,
+      "mode": "interrupt",
+      "batch": 2,
+      "received": true,
+      "responded": false
+    },
+    {
+      "request_id": 3,
+      "mode": "interrupt",
+      "batch": 3,
+      "received": true,
+      "responded": false
+    },
+    {
+      "request_id": 4,
+      "mode": "resume",
+      "batch": 3,
+      "received": true,
+      "responded": true,
+      "delivered": true
+    },
+    {
+      "request_id": 5,
+      "mode": "resume",
+      "batch": 2,
+      "received": true,
+      "responded": true,
+      "delivered": true
+    },
+    {
+      "request_id": 6,
+      "mode": "resume",
+      "batch": 4,
+      "received": true,
+      "responded": true,
+      "delivered": true
+    }
+  ],
+  "resume_requested_batches": [
+    3,
+    2,
+    4
+  ],
+  "final_cache_entries": 4,
+  "translated_srt": "E:\\traecode\\UtaSync\\UtaSyncNext\\output\\ui-translation-resume-48\\subtitles\\ui-translation-resume-48_极致打轴_双语字幕.srt",
+  "settings_restored": true
+}

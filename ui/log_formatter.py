@@ -61,6 +61,112 @@ def format_run_summary(summary: dict[str, Any]) -> str:
             f"（增加 {density_extra_cues} 轴），文字和原时间范围均保留。"
         )
 
+    extreme_duration_caps = int(summary.get("asr_extreme_duration_caps") or 0)
+    if extreme_duration_caps:
+        lines.append(
+            f"异常长轴：已缩短 {extreme_duration_caps} 条超过 18 秒的短文本长轴显示时间；"
+            "起点和文字未修改，仍建议结合原音复核。"
+        )
+
+    auto_suppressed = int(summary.get("asr_auto_suppressed") or 0)
+    if auto_suppressed:
+        lines.append(
+            f"识别清理：已保守过滤 {auto_suppressed} 条明确误识别；原文和理由已记录在识别诊断中。"
+        )
+
+    opening_cleanup_count = int(summary.get("asr_opening_cleanup_count") or 0)
+    opening_cleanup_anchor = str(summary.get("asr_opening_cleanup_anchor") or "").strip()
+    if opening_cleanup_count:
+        anchor_text = f"参考歌词锚点为“{opening_cleanup_anchor}”" if opening_cleanup_anchor else "已找到歌词锚点"
+        lines.append(
+            f"歌词边界清理：依据{anchor_text}和识别置信度，已移除 {opening_cleanup_count} 条明确误识别；"
+            "普通口播和歌词不会仅凭文本相似自动删除。"
+        )
+
+    watermark_cleanup_count = int(summary.get("asr_watermark_cleanup_count") or 0)
+    if watermark_cleanup_count:
+        lines.append(
+            f"识别清理：已移除 {watermark_cleanup_count} 条已知水印式误识别（如 Sound Hodori）；"
+            "普通歌词和单独出现的社交平台提及不会因此删除。"
+        )
+
+    lyric_gap_candidates = int(summary.get("asr_lyric_gap_candidates") or 0)
+    lyric_gap_repaired = int(summary.get("asr_lyric_gap_repaired_candidates") or 0)
+    lyric_gap_partial = int(summary.get("asr_lyric_gap_partially_repaired_candidates") or 0)
+    lyric_gap_inserted = int(summary.get("asr_lyric_gap_inserted_cues") or 0)
+    lyric_gap_partial_inserted = int(summary.get("asr_lyric_gap_partial_inserted_cues") or 0)
+    lyric_gap_report_path = str(summary.get("asr_lyric_gap_report_path") or "").strip()
+    lyric_gap_evidence_path = str(summary.get("asr_lyric_gap_repair_evidence_path") or "").strip()
+    lyric_gap_previews = int(summary.get("asr_lyric_gap_preview_candidates") or 0)
+    lyric_gap_preview_inserted = int(summary.get("asr_lyric_gap_preview_inserted_cues") or 0)
+    lyric_gap_preview_path = str(summary.get("asr_lyric_gap_preview_path") or "").strip()
+    lyric_gap_preview_evidence = str(summary.get("asr_lyric_gap_preview_evidence_path") or "").strip()
+    if lyric_gap_previews:
+        preview_detail = f"，预览见 {Path(lyric_gap_preview_path).name}" if lyric_gap_preview_path else ""
+        evidence_detail = (
+            f"，证据见 {Path(lyric_gap_preview_evidence).name}" if lyric_gap_preview_evidence else ""
+        )
+        lines.append(
+            f"歌词缺轴复查：已生成 {lyric_gap_previews} 份严格修复预览，共包含 "
+            f"{lyric_gap_preview_inserted} 条候选歌词轴{preview_detail}{evidence_detail}；"
+            "正式字幕未修改，确认后再采用。"
+        )
+    if lyric_gap_repaired:
+        complete_inserted = max(0, lyric_gap_inserted - lyric_gap_partial_inserted)
+        detail = f"，处理记录见 {Path(lyric_gap_evidence_path).name}" if lyric_gap_evidence_path else ""
+        lines.append(
+            f"歌词缺轴复查：已确认并补回 {lyric_gap_repaired} 处空档，共增加 {complete_inserted} 条歌词轴{detail}；"
+            "原字幕没有移动或删除，补轴前版本已保留。"
+        )
+    if lyric_gap_partial:
+        detail = f"，处理记录见 {Path(lyric_gap_evidence_path).name}" if lyric_gap_evidence_path else ""
+        lines.append(
+            f"歌词缺轴复查：{lyric_gap_partial} 处仅补回了证据可靠的部分，共增加 "
+            f"{lyric_gap_partial_inserted} 条歌词轴{detail}；该处仍需人工复听。"
+        )
+    if lyric_gap_candidates:
+        remaining = max(0, lyric_gap_candidates - lyric_gap_repaired)
+        detail = f"，复听清单见 {Path(lyric_gap_report_path).name}" if lyric_gap_report_path else ""
+        if remaining:
+            if lyric_gap_previews:
+                lines.append(
+                    f"歌词开头检查：{remaining} 处仍未写入正式字幕，其中 {lyric_gap_previews} 处已有候选预览{detail}；"
+                    "其余证据不足，均保留人工复听。"
+                )
+            elif lyric_gap_partial:
+                lines.append(
+                    f"歌词开头检查：仍有 {remaining} 处没有完全确认，需要人工复听{detail}；"
+                    "系统只写入了证据可靠的歌词，其余内容没有强行补写。"
+                )
+            else:
+                lines.append(
+                    f"歌词开头检查：仍有 {remaining} 处证据不足，需要人工复听{detail}；"
+                    "系统没有强行补写。"
+                )
+
+    review_candidates = int(summary.get("asr_review_candidates") or 0)
+    diagnostics_path = str(summary.get("asr_diagnostics_path") or "").strip()
+    diagnostics_level = str(summary.get("asr_diagnostics_level") or "").strip()
+    if review_candidates:
+        detail = f"，详情见 {Path(diagnostics_path).name}" if diagnostics_path else ""
+        if diagnostics_level == "basic":
+            lines.append(
+                f"基础复听提醒：从缓存字幕中发现 {review_candidates} 条文本可能需要确认{detail}；"
+                "缓存没有保留原始识别置信度，系统没有自动删除任何字幕。"
+            )
+        else:
+            untouched = "其余候选未自动删除。" if opening_cleanup_count else "系统没有自动删除任何字幕。"
+            lines.append(
+                f"复听提醒：发现 {review_candidates} 条字幕可能需要确认{detail}；{untouched}"
+            )
+    elif diagnostics_path:
+        if diagnostics_level == "basic":
+            lines.append(
+                "基础复听检查：缓存字幕中未发现明显文本异常；由于没有原始识别置信度，这不代表所有片段都没有问题。"
+            )
+        else:
+            lines.append("复听检查：未发现明显的连续重复或制作名单式字幕；系统没有自动删除任何字幕。")
+
     if summary.get("audio_cache_hit"):
         lines.append("音频：复用缓存，跳过提取和分离。")
     elif summary.get("demucs_skipped"):
@@ -84,23 +190,33 @@ def format_run_summary(summary: dict[str, Any]) -> str:
             parts.append(f"缓存命中 {cache_hits} 批")
         if api_calls:
             parts.append(f"接口请求 {api_calls} 次")
+        elif batches and cache_hits >= batches:
+            parts.append("未调用接口")
         if failed:
             parts.append(f"失败 {failed} 批")
         lines.append("翻译：" + "，".join(parts) + "。")
         alignment_fallbacks = int(summary.get("translation_alignment_fallbacks") or 0)
+        coverage_retries = int(summary.get("translation_bilingual_coverage_retries") or 0)
         removed_labels = int(summary.get("translation_speaker_labels_removed") or 0)
         speaker_warnings = int(summary.get("translation_speaker_label_warnings") or 0)
         lyric_warnings = int(summary.get("translation_lyric_alignment_warnings") or 0)
+        lyric_gap_warnings = int(summary.get("translation_lyric_gap_warnings") or 0)
         if alignment_fallbacks:
             lines.append(
                 f"翻译保护：有 {alignment_fallbacks} 条内容未能可靠对应，已保留该处原文，后续字幕没有顺移。"
             )
+        if coverage_retries:
+            lines.append(f"翻译完整性：发现 {coverage_retries} 次批次缺少中文，已自动重新翻译。")
         if removed_labels:
             lines.append(f"对谈清理：已移除 {removed_labels} 处高置信角色标签。")
         if speaker_warnings:
             lines.append(f"复核提醒：仍检测到 {speaker_warnings} 类疑似说话人冠名，请检查对应字幕。")
         if lyric_warnings:
             lines.append(f"歌词复核：仍有 {lyric_warnings} 处相邻歌词疑似重复，请检查对应字幕。")
+        if lyric_gap_warnings:
+            lines.append(
+                f"歌词复核：发现 {lyric_gap_warnings} 处参考歌词开场缺口，后续字幕可能整体顺移；系统未自动改轴。"
+            )
     else:
         lines.append("翻译：未配置接口，本次只生成原文字幕。")
 
@@ -146,6 +262,8 @@ def _format_known_line(text: str) -> str | None:
         return "日志：错误详情已保存：" + _short_file_name(_suffix_after_colon(text))
     if text.startswith("错误日志保存失败"):
         return "日志：错误详情保存失败：" + _suffix_after_colon(text)
+    if text.startswith("恢复："):
+        return text.strip()
     if "未选择媒体，仅运行就绪检查" in text:
         return "系统：未选择媒体，正在检查独立进程是否可用。"
     if text.startswith("就绪检查进行中"):
@@ -163,6 +281,9 @@ def _format_known_line(text: str) -> str | None:
         if model_match:
             return "模型：使用本地打轴模型：" + _strip_snapshot_hash(model_match.group(1).strip())
         return "模型：正在检查本地打轴模型。"
+    if "[硬件预检]" in text:
+        detail = text.split("]", 1)[-1].strip()
+        return "硬件：" + detail
 
     if "检测到有效音频缓存" in text:
         return "缓存：已找到可复用音频，跳过提取和分离。"
@@ -179,7 +300,7 @@ def _format_known_line(text: str) -> str | None:
             return "缓存：已有可复用翻译结果，本次不会重新请求接口。"
         return "缓存：没有可复用翻译结果，本次会请求接口。"
     if "[断点续传]" in text:
-        return "缓存：已从上次结果继续处理。"
+        return "缓存：上次打轴已完整保存，本次跳过重新识别并继续后续处理。"
 
     asr = _format_asr_line(text)
     if asr is not None:
@@ -187,6 +308,24 @@ def _format_known_line(text: str) -> str | None:
 
     if "[性能报告]" in text:
         return "性能：打轴阶段耗时：" + _suffix_after_colon(text)
+    if text.startswith("[打轴检查] 发现"):
+        return text.replace("[打轴检查]", "复听提醒：", 1).strip()
+    if text.startswith("[打轴检查] 基础检查"):
+        return text.replace("[打轴检查]", "基础复听检查：", 1).strip()
+    if text.startswith("[打轴检查] 没有发现"):
+        return text.replace("[打轴检查]", "复听检查：", 1).strip()
+    if text.startswith("[打轴检查] 诊断文件:") or text.startswith("[打轴检查] 诊断文件："):
+        return "复听检查：诊断文件已保存：" + _short_file_name(_suffix_after_colon(text))
+    if text.startswith("[打轴检查] 诊断文件保存失败"):
+        return "复听检查：诊断文件保存失败，但字幕结果不受影响。"
+    if text.startswith("[开场检查]"):
+        return "开场清理：" + text.split("]", 1)[-1].strip()
+    if text.startswith("[歌词边界检查]"):
+        return "歌词边界清理：" + text.split("]", 1)[-1].strip()
+    if text.startswith("[歌词缺轴复查]"):
+        return "歌词缺轴复查：" + text.split("]", 1)[-1].strip()
+    if text.startswith("[歌词缺轴检查]"):
+        return "歌词开头检查：" + text.split("]", 1)[-1].strip()
     if "[网络管家]" in text:
         if "代理" in text and "挂载" in text:
             return "网络：翻译请求正在使用代理：" + _suffix_after_colon(text)
@@ -194,6 +333,8 @@ def _format_known_line(text: str) -> str | None:
 
     if "[Next 翻译阶段]" in text:
         return "翻译：启动大模型翻译。"
+    if text.startswith("[歌词对齐检查]"):
+        return "歌词复核：" + text.split("]", 1)[-1].strip()
     if text.startswith("AI 语境翻译中"):
         pct = _last_percent(text)
         return f"翻译：进度 {pct}" if pct else "翻译：正在处理。"
@@ -206,9 +347,35 @@ def _format_known_line(text: str) -> str | None:
         if match:
             return f"翻译：开始处理，共 {match.group(2)} 批，并发 {match.group(1)}。"
         return "翻译：开始处理字幕。"
+    retry_match = re.search(r"批次\s*(\d+)/(\d+)\s*失败，(\d+)s\s*后重试", text)
+    if retry_match:
+        reason = _friendly_api_failure_reason(text)
+        return (
+            f"翻译：第 {retry_match.group(1)}/{retry_match.group(2)} 批请求失败"
+            f"（{reason}），{retry_match.group(3)} 秒后自动重试。"
+        )
+    failed_match = re.search(r"批次\s*(\d+)/(\d+)\s*多次失败", text)
+    if failed_match:
+        return (
+            f"翻译：第 {failed_match.group(1)}/{failed_match.group(2)} 批多次请求失败，"
+            "本次暂时保留原文；重新启动会只补这个批次。"
+        )
+    if text.startswith("[错误] 翻译阶段失败"):
+        return "翻译：任务未完成，具体原因已保存到错误日志。"
+    if text.startswith("[建议] 检查 API Key"):
+        return "翻译：请检查接口密钥、服务地址、模型名称或代理设置；已完成批次不会丢失。"
+    if text.startswith("[翻译缓存] 完整结果命中"):
+        return "翻译：完整结果缓存命中，未请求接口。"
+    if text.startswith("[翻译缓存]"):
+        return "翻译：部分批次未完成，成功批次已保存；重新启动只补失败部分。"
+    if "Next 管线异常" in text:
+        return "任务：处理未完成，请查看错误日志和恢复建议。"
     if "[翻译进度]" in text:
         pct = _last_percent(text)
         return f"翻译：进度 {pct}" if pct else "翻译：进度更新。"
+    if text.startswith("[完成]") and "翻译缓存复用完成" in text:
+        seconds = re.search(r"整理耗时\s*(\d+)\s*秒", text)
+        return f"翻译：缓存复用完成，整理用时 {seconds.group(1)} 秒。" if seconds else "翻译：缓存复用完成。"
     if text.startswith("[完成]") and "翻译完成" in text:
         seconds = re.search(r"耗时\s*(\d+)\s*秒", text)
         return f"翻译：完成，用时 {seconds.group(1)} 秒。" if seconds else "翻译：完成。"
@@ -240,6 +407,19 @@ def _format_known_line(text: str) -> str | None:
         return "压制：失败：" + _suffix_after_bracket(text)
 
     return None
+
+
+def _friendly_api_failure_reason(text: str) -> str:
+    lowered = str(text or "").lower()
+    if "429" in lowered or "rate limit" in lowered:
+        return "服务繁忙或请求过快"
+    if re.search(r"\b5\d\d\b", lowered):
+        return "翻译服务暂时不可用"
+    if "timeout" in lowered or "timed out" in lowered:
+        return "网络响应超时"
+    if any(token in lowered for token in ("connection", "connecterror", "network")):
+        return "无法连接翻译服务"
+    return "网络或服务临时异常"
 
 
 def _format_asr_line(text: str) -> str | None:

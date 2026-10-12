@@ -18,9 +18,10 @@ AUDIO_TYPE_OPTIONS = [
 DEFAULT_AUDIO_TYPE = AUDIO_TYPE_OPTIONS[0]
 
 HARDWARE_MODE_OPTIONS = [
-    "极限防爆 (4G~6G显存/默认)",
-    "均衡提速 (8G显存)",
-    "满血狂飙 (12G+显存)",
+    "自动匹配显存 (推荐)",
+    "保守分离 (4G~6G显存)",
+    "均衡分离 (8G显存)",
+    "快速分离 (12G+显存)",
 ]
 DEFAULT_HARDWARE_MODE = HARDWARE_MODE_OPTIONS[0]
 

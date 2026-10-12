@@ -12,7 +12,10 @@ if str(ROOT) not in sys.path:
 from core.translator import (
     SrtBlock,
     SubtitleTranslator,
+    _bilingual_line_counts,
+    _should_retry_bilingual_coverage,
     _strip_known_speaker_labels,
+    _suspected_opening_lyric_gaps,
     _suspected_lyric_sequence_issues,
     _suspected_speaker_labels,
 )
@@ -48,6 +51,33 @@ def main() -> int:
         return 1
     if translator.alignment_fallbacks != 1:
         print(f"[FAIL] Expected one alignment fallback, got {translator.alignment_fallbacks}.")
+        return 1
+
+    incomplete_bilingual = """1
+00:00:01,000 --> 00:00:02,000
+原文一
+
+2
+00:00:02,000 --> 00:00:03,000
+原文二
+"""
+    complete_bilingual = incomplete_bilingual.replace("原文一", "原文一\n翻译一").replace(
+        "原文二", "原文二\n翻译二"
+    )
+    if _bilingual_line_counts(incomplete_bilingual) != (0, 2):
+        print("[FAIL] Missing Chinese lines were not detected.")
+        return 1
+    if _bilingual_line_counts(complete_bilingual) != (2, 2):
+        print("[FAIL] Complete bilingual lines were not recognized.")
+        return 1
+    if not _should_retry_bilingual_coverage(11, 12, already_retried=False):
+        print("[FAIL] A single missing translation did not trigger one local retry.")
+        return 1
+    if _should_retry_bilingual_coverage(11, 12, already_retried=True):
+        print("[FAIL] A mostly complete batch would retry forever after the local retry.")
+        return 1
+    if not _should_retry_bilingual_coverage(8, 12, already_retried=True):
+        print("[FAIL] A substantially incomplete batch was accepted after one retry.")
         return 1
 
     labels = _suspected_speaker_labels(
@@ -107,7 +137,11 @@ def main() -> int:
         "",
         "少し湿った手を握りなおした",
     )
-    if "前一轴写完整句、后一轴又重复句尾" not in lyric_prompt or "不要提前套用下一句歌词" not in lyric_prompt:
+    if (
+        "前一轴写完整句、后一轴又重复句尾" not in lyric_prompt
+        or "不要提前套用下一句歌词" not in lyric_prompt
+        or "严禁为了逐行套歌词而占用后续时间轴" not in lyric_prompt
+    ):
         print("[FAIL] Prompt does not contain the lyric sequence alignment policy.")
         return 1
     if "歌词顺序对齐" in prompt:
@@ -128,8 +162,46 @@ def main() -> int:
 触れたいから
 想要触碰
 """
-    if _suspected_lyric_sequence_issues(lyric_overlap, lyric_source) != ["1->2"]:
-        print("[FAIL] Adjacent lyric tail duplication was not detected.")
+    overlap_issues = _suspected_lyric_sequence_issues(lyric_overlap, lyric_source)
+    if "1->2" not in overlap_issues:
+        print(f"[FAIL] Adjacent lyric tail duplication was not detected: {overlap_issues}")
+        return 1
+
+    shifted_source = [
+        SrtBlock(7, "00:01:11,000 --> 00:01:16,500", ("ねえ もしも 全て忘れられたなら",)),
+        SrtBlock(8, "00:01:16,500 --> 00:01:22,500", ("泣かないで 生きることも楽になるの",)),
+        SrtBlock(9, "00:01:22,500 --> 00:01:26,740", ("でもそんなことできないから",)),
+        SrtBlock(10, "00:01:26,740 --> 00:01:30,500", ("もう何も見せないでよ",)),
+        SrtBlock(11, "00:01:32,500 --> 00:01:38,200", ("君にどれだけ近づいても",)),
+    ]
+    shifted_output = """7
+00:01:11,000 --> 00:01:16,500
+ねえ もしも
+呐 如果
+
+8
+00:01:16,500 --> 00:01:22,500
+全て忘れられたなら
+能够忘记一切的话
+
+9
+00:01:22,500 --> 00:01:26,740
+泣かないで
+不要哭泣
+
+10
+00:01:26,740 --> 00:01:30,500
+生きることも楽になるの
+生活就会变得轻松吗
+
+11
+00:01:32,500 --> 00:01:38,200
+でもそんなことできないから
+但这种事我做不到
+"""
+    displacement_issues = _suspected_lyric_sequence_issues(shifted_output, shifted_source)
+    if not {"7=>8", "8=>9", "8=>10", "9=>11"}.issubset(set(displacement_issues)):
+        print(f"[FAIL] Cross-cue lyric displacement was not detected: {displacement_issues}")
         return 1
 
     actual_refrain = [
@@ -141,6 +213,118 @@ def main() -> int:
     )
     if _suspected_lyric_sequence_issues(refrain_output, actual_refrain):
         print("[FAIL] A refrain already present in the source was treated as model duplication.")
+        return 1
+
+    short_tail_source = [
+        SrtBlock(61, "00:05:27,600 --> 00:05:31,600", ("また美しい理由",)),
+        SrtBlock(62, "00:05:31,600 --> 00:05:38,600", ("現実と偽善分が",)),
+        SrtBlock(63, "00:05:39,600 --> 00:05:41,600", ("疲れたよ",)),
+    ]
+    short_tail_output = """61
+00:05:27,600 --> 00:05:31,600
+また美しい言い訳
+又一次美丽的借口
+
+62
+00:05:31,600 --> 00:05:38,600
+現実逃避 全部が疲れたよ
+逃避现实 一切都让我疲惫不堪
+
+63
+00:05:39,600 --> 00:05:41,600
+疲れたよ
+好累啊
+"""
+    if _suspected_lyric_sequence_issues(short_tail_output, short_tail_source):
+        print("[FAIL] A corrected lyric containing a short adjacent tail was rejected.")
+        return 1
+
+    opening_reference = """おしゃかしゃま - RADWIMPS
+词：野田洋次郎
+曲：野田洋次郎
+カラスが増えたから殺します
+さらに猿が増えたから減らします
+でもパンダは減ったから増やします
+けど人類は増えても増やします"""
+    opening_shift = """1
+00:01:25,000 --> 00:01:27,000
+さらに猿が増えたから減らします
+因为猴子又增加了所以要减少
+
+2
+00:01:27,000 --> 00:01:29,000
+でもパンダは減ったから増やします
+但是熊猫减少了就要增加
+"""
+    opening_issues = _suspected_opening_lyric_gaps(opening_shift, opening_reference)
+    if len(opening_issues) != 1 or opening_issues[0]["time"] != "00:01:25,000":
+        print(f"[FAIL] Opening reference lyric gap was not located: {opening_issues}")
+        return 1
+    opening_complete = opening_shift.replace(
+        "さらに猿が増えたから減らします",
+        "カラスが増えたから殺します\n因为乌鸦增加了所以要杀掉\n\n3\n"
+        "00:01:27,000 --> 00:01:29,000\nさらに猿が増えたから減らします",
+        1,
+    )
+    if _suspected_opening_lyric_gaps(opening_complete, opening_reference):
+        print("[FAIL] Complete opening lyrics were treated as a gap.")
+        return 1
+
+    repeated_reference = """色彩 - yama
+词：くじら
+曲：くじら
+じっと機微を見逃さないで
+きっと大人はそれらしくするので
+かかりきりになるんだ
+関心はまだ僕ら
+真珠の欠片だって無価値
+そこに物語がなければ
+からくりのなかで廻る僕ら命だ
+じっと日々を見逃さないで
+きっと大人はそれらしくするので
+かかりきりになるんだ
+関心はまだ僕ら
+真珠のかけらだって無価値
+そこに物語がなければ
+からくりの中で廻る僕ら命だ
+"""
+    repeated_output = """1
+00:00:26,000 --> 00:00:28,000
+じっと日々を見逃さないで
+日复一日不要错过
+
+2
+00:00:28,000 --> 00:00:31,000
+きっと大人はそれらしくするので
+大人一定会装出大人的样子
+
+3
+00:00:31,000 --> 00:00:33,000
+かかりきりになるんだ
+会变得专注其中
+
+4
+00:00:33,000 --> 00:00:35,000
+関心はまだ僕ら
+我们仍然在意
+
+5
+00:00:35,000 --> 00:00:37,000
+真珠のかけらだって無価値
+即使是珍珠碎片也没有价值
+
+6
+00:00:37,000 --> 00:00:39,000
+そこに物語がなければ
+如果那里没有故事
+
+7
+00:00:39,000 --> 00:00:41,000
+からくりの中で廻る僕ら命だ
+我们是转动于机关中的生命
+"""
+    if _suspected_opening_lyric_gaps(repeated_output, repeated_reference):
+        print("[FAIL] A later repeated refrain was treated as a false opening gap.")
         return 1
 
     translator.context_title = "#170yamaびこリフレイン"
@@ -157,17 +341,21 @@ def main() -> int:
         {
             "translation_requested": True,
             "translation_alignment_fallbacks": 1,
+            "translation_bilingual_coverage_retries": 1,
             "translation_speaker_label_warnings": 2,
             "translation_speaker_labels_removed": 3,
             "translation_lyric_alignment_warnings": 1,
+            "translation_lyric_gap_warnings": 1,
             "translation_model": "deepseek-ai/DeepSeek-V3",
         }
     )
     if (
         "已保留该处原文" not in summary
+        or "批次缺少中文" not in summary
         or "疑似说话人冠名" not in summary
         or "已移除 3 处高置信角色标签" not in summary
         or "相邻歌词疑似重复" not in summary
+        or "参考歌词开场缺口" not in summary
         or "DeepSeek-V3" not in summary
     ):
         print("[FAIL] User-facing summary does not explain translation guardrail results.")

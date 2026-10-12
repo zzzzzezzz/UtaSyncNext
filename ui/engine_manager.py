@@ -15,6 +15,7 @@ from engine.cache_env import app_root, apply_next_cache_env, huggingface_cache_r
 from engine.model_downloader import MODEL_SOURCES, SOURCE_OFFICIAL, ModelDownloadError, download_model
 from engine.model_downloader import preflight_model_download
 from engine.model_registry import is_complete_snapshot, next_models_root, scan_models
+from engine.model_source_check import check_model_sources, format_source_check_report
 from ui.engine_manager_support import (
     format_bytes,
     format_speed,
@@ -27,6 +28,7 @@ from ui.engine_manager_support import (
     target_cache_dir_name,
 )
 from ui.theme import ACCENT_GREEN, BG_CARD, BG_WORKSPACE, TEXT_HINT, TEXT_MUTED, TEXT_TITLE
+from ui.window_icon import apply_child_window_icon
 
 
 BORDER = "#2A2A2A"
@@ -35,12 +37,14 @@ BORDER = "#2A2A2A"
 def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     manager = ctk.CTkToplevel(parent)
     manager.title("UtaSyncNext - 独立模型管理")
-    manager.geometry("820x640")
+    # Reserve enough room for the fixed settings panels and footer. The model
+    # list expands between them and remains the only vertically scrolling area.
+    manager.geometry("980x760")
+    manager.minsize(900, 700)
     manager.configure(fg_color=BG_WORKSPACE)
     manager.transient(parent)
     manager.grab_set()
-    if icon_photo:
-        manager.iconphoto(True, icon_photo)
+    apply_child_window_icon(manager, parent)
 
     model_root = next_models_root()
     model_root.mkdir(parents=True, exist_ok=True)
@@ -48,6 +52,14 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     hf_cache_root = huggingface_cache_root()
     user_hf_cache = Path.home() / ".cache" / "huggingface"
     user_cache_note = "旧 C 盘 HF 缓存：存在（Next 不依赖）" if user_hf_cache.exists() else "旧 C 盘 HF 缓存：未检测到"
+    nearby_source_models = None
+    if getattr(sys, "frozen", False):
+        candidate = app_root().parents[1] / "models_faster"
+        try:
+            if candidate.resolve() != model_root.resolve() and candidate.exists():
+                nearby_source_models = candidate
+        except OSError:
+            nearby_source_models = None
 
     shell = ctk.CTkFrame(manager, fg_color=BG_CARD, border_color=BORDER, border_width=1, corner_radius=16)
     shell.pack(fill="both", expand=True, padx=24, pady=24)
@@ -63,14 +75,21 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     ).pack(anchor="w")
     ctk.CTkLabel(
         header,
-        text=f"当前目录：{model_root}",
+        text=(
+            f"引擎目录：{app_root() / '.engine'}（{'已检测到' if engine_ready else '未检测到'}）\n"
+            f"模型目录：{model_root}"
+        ),
         font=ctk.CTkFont(family="Microsoft YaHei", size=12),
         text_color=TEXT_HINT,
         wraplength=680,
     ).pack(anchor="w", pady=(6, 0))
     ctk.CTkLabel(
         header,
-        text="这里不读取 V3 模型目录。缺模型时请导入完整缓存，或后续接入可断点续传的下载器。",
+        text=(
+            "这里不读取 V3 模型目录。缺模型时可在下方预检并下载到 Next 专属目录；网络中断后可继续复用已有缓存。"
+            + (f"\n检测到另一个 Next 本地缓存：{nearby_source_models}，可用“导入本地模型”接入。" if nearby_source_models else "")
+            + "\n本机体检检查本地引擎、依赖和 FFmpeg；模型源巡检只检查在线仓库清单和代理，不会下载模型。"
+        ),
         font=ctk.CTkFont(family="Microsoft YaHei", size=12),
         text_color=TEXT_MUTED,
         wraplength=680,
@@ -126,7 +145,7 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
 
     ctk.CTkLabel(
         source_bar,
-        text="官方源已验证，镜像源可切换",
+        text="官方源已验证；镜像不可用时会自动回退官方源",
         font=ctk.CTkFont(family="Microsoft YaHei", size=11),
         text_color=TEXT_HINT,
     ).pack(side="left", padx=(8, 14), pady=12)
@@ -161,17 +180,23 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
 
     footer = ctk.CTkFrame(shell, fg_color="transparent")
     footer.pack(fill="x", padx=22, pady=(0, 20))
-
+    # Keep the changing download text in its own row so a long status message
+    # can never squeeze the fixed action buttons next to it.
+    status_row = ctk.CTkFrame(footer, fg_color="transparent")
+    status_row.pack(fill="x", pady=(0, 6))
     status_label = ctk.CTkLabel(
-        footer,
+        status_row,
         text="就绪",
         font=ctk.CTkFont(family="Microsoft YaHei", size=12),
         text_color=TEXT_HINT,
+        anchor="w",
     )
-    status_label.pack(side="left")
-    download_progress = ctk.CTkProgressBar(footer, width=170, mode="determinate")
+    status_label.pack(side="left", fill="x", expand=True)
+    download_progress = ctk.CTkProgressBar(status_row, width=170, mode="determinate")
     download_progress.set(0)
-    download_progress.pack(side="left", padx=12)
+    download_progress.pack(side="right", padx=(12, 0))
+    action_row = ctk.CTkFrame(footer, fg_color="transparent")
+    action_row.pack(fill="x")
     download_busy = {"value": False}
     action_busy = {"value": False}
     manager_closed = threading.Event()
@@ -289,7 +314,11 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         os.startfile(user_hf_cache)
 
     def import_model() -> None:
-        source = filedialog.askdirectory(title="选择完整 faster-whisper 缓存目录或 snapshot 目录", parent=manager)
+        source = filedialog.askdirectory(
+            title="选择完整 faster-whisper 缓存目录或 snapshot 目录",
+            initialdir=str(nearby_source_models or model_root),
+            parent=manager,
+        )
         if not source:
             return
         source_path = Path(source)
@@ -428,11 +457,11 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
 
     def run_health_check() -> None:
         if download_busy["value"] or action_busy["value"]:
-            messagebox.showinfo("正在忙碌", "当前已有任务在运行，请稍后再执行快速体检。", parent=manager)
+            messagebox.showinfo("正在忙碌", "当前已有任务在运行，请稍后再执行本机体检。", parent=manager)
             return
 
         action_busy["value"] = True
-        status_label.configure(text="正在执行 Next 快速体检...")
+        status_label.configure(text="正在执行本机体检...")
         download_progress.set(0.15)
 
         def worker() -> None:
@@ -460,22 +489,56 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
                 output = tail_text(completed.stdout, 1800)
                 if completed.returncode == 0:
                     safe_after(lambda: download_progress.set(1))
-                    safe_after(lambda: status_label.configure(text=f"快速体检通过，用时 {elapsed:.1f}s"))
-                    safe_after(lambda: messagebox.showinfo("快速体检通过", output or "health profile passed.", parent=manager))
+                    safe_after(lambda: status_label.configure(text=f"本机体检通过，用时 {elapsed:.1f}s"))
+                    safe_after(lambda: messagebox.showinfo("本机体检通过", output or "health profile passed.", parent=manager))
                 else:
                     safe_after(lambda: download_progress.set(0))
-                    safe_after(lambda: status_label.configure(text="快速体检失败"))
-                    safe_after(lambda: messagebox.showerror("快速体检失败", output, parent=manager))
+                    safe_after(lambda: status_label.configure(text="本机体检失败"))
+                    safe_after(lambda: messagebox.showerror("本机体检失败", output, parent=manager))
             except subprocess.TimeoutExpired as exc:
                 output = tail_text(exc.stdout or "", 1800)
                 safe_after(lambda: download_progress.set(0))
-                safe_after(lambda: status_label.configure(text="快速体检超时"))
-                safe_after(lambda: messagebox.showerror("快速体检超时", output or "health check timed out.", parent=manager))
+                safe_after(lambda: status_label.configure(text="本机体检超时"))
+                safe_after(lambda: messagebox.showerror("本机体检超时", output or "health check timed out.", parent=manager))
             except Exception as exc:
                 error_text = str(exc)
                 safe_after(lambda: download_progress.set(0))
-                safe_after(lambda: status_label.configure(text="快速体检失败"))
-                safe_after(lambda: messagebox.showerror("快速体检失败", error_text, parent=manager))
+                safe_after(lambda: status_label.configure(text="本机体检失败"))
+                safe_after(lambda: messagebox.showerror("本机体检失败", error_text, parent=manager))
+            finally:
+                action_busy["value"] = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def run_model_source_check() -> None:
+        if download_busy["value"] or action_busy["value"]:
+            messagebox.showinfo("正在忙碌", "当前已有任务在运行，请稍后再执行模型源巡检。", parent=manager)
+            return
+
+        action_busy["value"] = True
+        status_label.configure(text="正在巡检官方源和镜像源文件清单...")
+        download_progress.set(0.1)
+
+        def worker() -> None:
+            try:
+                payload = check_model_sources(
+                    proxy_url=proxy_entry.get().strip(),
+                    report_path=app_root() / "test_logs" / "model_sources-latest.json",
+                )
+                summary = format_source_check_report(payload)
+                if payload.get("ok"):
+                    safe_after(lambda: download_progress.set(1))
+                    safe_after(lambda: status_label.configure(text="模型源巡检通过"))
+                    safe_after(lambda: messagebox.showinfo("模型源巡检通过", summary, parent=manager))
+                else:
+                    safe_after(lambda: download_progress.set(0))
+                    safe_after(lambda: status_label.configure(text="模型源巡检发现错误"))
+                    safe_after(lambda: messagebox.showerror("模型源巡检发现错误", summary, parent=manager))
+            except Exception as exc:
+                error_text = str(exc)
+                safe_after(lambda: download_progress.set(0))
+                safe_after(lambda: status_label.configure(text="模型源巡检失败"))
+                safe_after(lambda: messagebox.showerror("模型源巡检失败", error_text, parent=manager))
             finally:
                 action_busy["value"] = False
 
@@ -550,29 +613,32 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
             side="right", padx=(8, 0)
         )
 
-    ctk.CTkButton(footer, text="GPU 升级指南", width=105, command=show_gpu_upgrade_guide, fg_color="#1F2937").pack(
-        side="right", padx=(8, 0)
+    ctk.CTkButton(action_row, text="GPU 升级指南", width=100, command=show_gpu_upgrade_guide, fg_color="#1F2937").pack(
+        side="right", padx=(6, 0)
     )
-    ctk.CTkButton(footer, text="快速体检", width=90, command=run_health_check, fg_color="#1F2937").pack(
-        side="right", padx=(8, 0)
+    ctk.CTkButton(action_row, text="本机体检", width=84, command=run_health_check, fg_color="#1F2937").pack(
+        side="right", padx=(6, 0)
     )
-    ctk.CTkButton(footer, text="打开模型目录", width=120, command=open_model_dir, fg_color="#1F2937").pack(
-        side="right", padx=(8, 0)
+    ctk.CTkButton(action_row, text="模型源巡检", width=94, command=run_model_source_check, fg_color="#1F2937").pack(
+        side="right", padx=(6, 0)
     )
-    ctk.CTkButton(footer, text="打开缓存目录", width=120, command=open_cache_dir, fg_color="#1F2937").pack(
-        side="right", padx=(8, 0)
+    ctk.CTkButton(action_row, text="打开模型目录", width=110, command=open_model_dir, fg_color="#1F2937").pack(
+        side="right", padx=(6, 0)
     )
-    ctk.CTkButton(footer, text="旧缓存位置", width=100, command=open_user_cache_dir, fg_color="#1F2937").pack(
-        side="right", padx=(8, 0)
+    ctk.CTkButton(action_row, text="打开缓存目录", width=110, command=open_cache_dir, fg_color="#1F2937").pack(
+        side="right", padx=(6, 0)
     )
-    ctk.CTkButton(footer, text="刷新", width=90, command=refresh, fg_color="#1F2937").pack(side="right", padx=(8, 0))
+    ctk.CTkButton(action_row, text="旧缓存位置", width=94, command=open_user_cache_dir, fg_color="#1F2937").pack(
+        side="right", padx=(6, 0)
+    )
+    ctk.CTkButton(action_row, text="刷新", width=80, command=refresh, fg_color="#1F2937").pack(side="right", padx=(6, 0))
     ctk.CTkButton(
-        footer,
+        action_row,
         text="导入本地模型",
-        width=130,
+        width=118,
         command=import_model,
         fg_color=ACCENT_GREEN,
         text_color="#000000",
-    ).pack(side="right", padx=(8, 0))
+    ).pack(side="right", padx=(6, 0))
 
     refresh()
