@@ -56,11 +56,11 @@ ASS_PRESETS: dict[str, dict[str, Any]] = {
     "樋口爱专属 (落日绯红/低饱和)": {
         "ch_font": "LXGW WenKai",
         "ch_size": 55,
-        "ch_color": "#FFF1F2",
+        "ch_color": "#FFFFFF",
         "ch_outline": "#3B050F",
         "jp_font": "Yu Mincho",
         "jp_size": 35,
-        "jp_color": "#C02840",
+        "jp_color": "#FF2E4D",
         "jp_outline": "#3B050F",
         "outline_size": 3,
         "shadow_size": 2,
