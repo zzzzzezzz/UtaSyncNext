@@ -48,9 +48,15 @@ V3 把一整条流水线塞进 1177 行的 `app.py` 加 `core/` 三个模块，�
 
 ## Next 不如 V3 的地方
 
-1. **硬件编码候选从 5 个减到 2 个**。V3 依次尝试 NVENC、VideoToolbox、QSV、AMF、libx264；Next 只有 NVENC 和 libx264。VideoToolbox 是 macOS 专用，对 Windows-only 的 Next 没意义；但 QSV（Intel 核显）和 AMF（AMD 显卡）对没有 NVIDIA 显卡的用户有实际价值，这一块目前是缺口。
+1. **硬件编码候选从 5 个减到 2 个**。V3 依次尝试 NVENC、VideoToolbox、QSV、AMF、libx264；Next 只有 NVENC 和 libx264。影响范围只有最后一步硬字幕压制，ASR、Demucs、翻译和 ASS 生成都不看这张表。
 
-   恢复成本很低：`utils/ffmpeg_tools.py` 的 `ENCODERS` 列表加两行即可，回退逻辑本来就是通用的。没有在冻结前直接改的原因有两个：这张卡不在本机可验证的范围内，而且部分 Intel 驱动下 QSV 会卡住而不是报错，加进回退链可能把"快速失败"变成"长时间无响应"。要不要补由你决定。
+   实际影响是速度而不是可用性：NVENC 不可用时退到 libx264 软压，仍然出片。在开发机（GTX 1660 SUPER、8 逻辑核）上实测 60 秒 1080p 素材带 ASS 花字：NVENC 7.7 秒，libx264（`superfast` / `crf 22` / `threads 4`）18.2 秒，相差约 2.4 倍；换算 15 分钟片子是 1.9 分钟对 4.6 分钟。一个反直觉的点是 NVENC 那条（`-cq 22`）输出 42.9 MB，libx264（`-crf 22`）只有 29.1 MB，硬件编码更快但文件更大。
+
+   换到 AMD 或 Intel 显卡时会退到 CPU 软压，慢 2.4 倍但照常出片；只有 ffmpeg 本身缺失或损坏才会完全压不出来。这台开发机的 ffmpeg 其实已经编进了 `h264_amf` 和 `h264_qsv`，只是代码没有去试。
+
+   恢复成本很低：`utils/ffmpeg_tools.py` 的 `ENCODERS` 列表加两行，再把 `burn()` 里写死"显卡回退 / CPU 也失败"的日志改成按候选名输出。实测三个不可用编码器（`h264_videotoolbox` 未编译、`h264_amf` 无 AMD 卡、`h264_qsv` 无可用 MFX 会话）全部在 1 到 2 秒内失败，三个合计 3.1 秒，所以加回候选项在不可用硬件上只多花一两秒，不会挂起。要不要补由你决定。
+
+   真正吃显卡的是 ASR 和 Demucs：它们依赖 CUDA，换成 AMD 卡会退到 CPU `int8`，那个慢得多。这一点 V3 和 Next 相同（V3 也是 `device="cuda"` 失败后退 CPU），不是 Next 的退步。
 
 2. **多了一层安装概念**。V3 是"装完依赖直接 `python app.py`"；Next 第一次要先跑 `tools\bootstrap_venv.ps1`，需要跑真任务时再加 `-Engine`。换来的是 Launcher 启动快、模型不重复打包、依赖可以独立升级。
 
