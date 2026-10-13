@@ -60,7 +60,7 @@ ASS_PRESETS: dict[str, dict[str, Any]] = {
         "ch_outline": "#3B050F",
         "jp_font": "Yu Mincho",
         "jp_size": 35,
-        "jp_color": "#CC2B45",
+        "jp_color": "#C02840",
         "jp_outline": "#3B050F",
         "outline_size": 3,
         "shadow_size": 2,
