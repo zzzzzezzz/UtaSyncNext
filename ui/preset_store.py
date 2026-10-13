@@ -13,12 +13,18 @@ from typing import Any, Mapping
 
 PRESET_META_KEY = "__meta__"
 AI_PRESET_PREFIX = "AI:"
+# Every built-in used to ship with this same pair, which is why nine presets
+# looked identical, and saving settings wrote a full copy of the catalog to
+# disk. Those copies keep winning over the built-ins, so they are dropped.
+LEGACY_FONT_PAIR = ("Microsoft YaHei", "Meiryo")
 
 
 def preset_file_path() -> Path:
-    """Return the app-owned preset file, relative to the runtime cwd."""
+    """Return the app-owned preset file, next to the app (not the cwd)."""
 
-    return Path("user_presets.json")
+    from engine.cache_env import app_root
+
+    return app_root() / "user_presets.json"
 
 
 def _empty_meta() -> dict[str, Any]:
@@ -78,8 +84,31 @@ def merge_presets(
             merged[new] = merged.pop(old)
     for name in meta.get("removed") or []:
         merged.pop(str(name), None)
-    merged.update({str(name): dict(config) for name, config in saved.items()})
+    merged.update(
+        {
+            str(name): dict(config)
+            for name, config in saved.items()
+            if not (name in defaults and is_legacy_builtin_snapshot(config, defaults[name]))
+        }
+    )
     return merged
+
+
+def is_legacy_builtin_snapshot(config: Mapping[str, Any], default: Mapping[str, Any]) -> bool:
+    """True when a saved entry is an old, font-identical copy of a built-in.
+
+    Distinguishing them matters: the pre-Next catalog shipped every built-in
+    with the same 雅黑 + Meiryo fonts and no ``description``, so a copy on disk
+    would silently keep the nine presets looking alike forever.
+    """
+
+    if str(config.get("description") or "").strip():
+        return False
+    saved_pair = (str(config.get("ch_font") or ""), str(config.get("jp_font") or ""))
+    if saved_pair != LEGACY_FONT_PAIR:
+        return False
+    default_pair = (str(default.get("ch_font") or ""), str(default.get("jp_font") or ""))
+    return default_pair != saved_pair
 
 
 def load_presets_into(

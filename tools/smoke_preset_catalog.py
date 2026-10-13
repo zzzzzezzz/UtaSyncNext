@@ -19,7 +19,7 @@ NEXT_ROOT = Path(__file__).resolve().parents[1]
 if str(NEXT_ROOT) not in sys.path:
     sys.path.insert(0, str(NEXT_ROOT))
 
-from core.ass_maker import ASS_PRESETS
+from core.ass_maker import ASS_PRESETS, BUILTIN_PRESETS
 from ui.ass_preview_frame import render_ass_preview_frame
 
 BOGUS_FONT = "UtaSync Missing Font Probe"
@@ -94,6 +94,8 @@ def main() -> int:
             continue
         ch_font = str(config["ch_font"])
         jp_font = str(config["jp_font"])
+        if ch_font.strip().casefold() == jp_font.strip().casefold():
+            problems.append(f"{name}: 中日字体相同，双语排版没有差异 -> {ch_font}")
         ch_ok = ch_font_resolves(ch_font)
         jp_ok = jp_font_resolves(jp_font)
         bright = _bright_pixel_count(config)
@@ -105,6 +107,14 @@ def main() -> int:
             problems.append(f"{name}: 日文字体在本机无法解析 -> {jp_font}")
         state = "OK" if ch_ok and jp_ok else "FONT"
         print(f"{state:4} {name} | 中文 {ch_font} | 日文 {jp_font} | 亮色像素 {bright}")
+
+    if len(ASS_PRESETS) != len(BUILTIN_PRESETS):
+        problems.append("ASS_PRESETS 与 BUILTIN_PRESETS 数量不一致")
+    if len(BUILTIN_PRESETS) < 9:
+        problems.append(f"内置预设数量不足 9 套（当前 {len(BUILTIN_PRESETS)}）")
+    for name, config in BUILTIN_PRESETS.items():
+        if not str(config.get("description", "")).strip():
+            problems.append(f"{name}: 缺少 description，侧栏卡片会退化成占位文案")
 
     print(f"\n共 {len(ASS_PRESETS)} 套预设")
     if problems:

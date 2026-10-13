@@ -12,6 +12,7 @@ from core.subtitle_policy import apply_layout_policy, resolve_subtitle_layout
 from ui.ass_preview_frame import render_ass_preview_frame
 from ui.design_tokens import UTASYNC_TOKENS
 from ui.font_catalog import discover_user_fonts, load_user_font_pairs, save_user_font_pairs
+from ui.font_preview_window import FontPreviewWindow
 from ui.preset_store import (
     load_presets_into,
     restore_builtin_presets,
@@ -32,16 +33,35 @@ PREVIEW_STAGE_MAX_HEIGHT = 460
 
 FONT_PAIR_OPTIONS: dict[str, tuple[str, str]] = {
     "雅黑 + Meiryo（默认）": ("Microsoft YaHei", "Meiryo"),
-    "思源黑体双语（现代清晰）": ("Source Han Sans CN", "Source Han Sans JP"),
-    "M PLUS + Zen Kaku（轻快日系）": ("M PLUS 1p", "Zen Kaku Gothic New"),
-    "雅黑 + Zen Kaku（稳重日系）": ("Microsoft YaHei", "Zen Kaku Gothic New"),
+    "思源黑体 CN + JP（同族黑体）": ("Source Han Sans CN", "Source Han Sans JP"),
+    "思源黑体 + Zen Kaku（日系轻快）": ("Source Han Sans CN", "Zen Kaku Gothic New"),
+    "思源黑体 + M PLUS（圆黑冰感）": ("Source Han Sans CN", "M PLUS 1p"),
     "思源黑体 + Meiryo（高可读）": ("Source Han Sans CN", "Meiryo"),
-    "思源黑体 + Noto Sans JP": ("Source Han Sans SC", "Noto Sans JP"),
-    "等线 + 游ゴシック": ("DengXian", "Yu Gothic"),
-    "黑体 + Hiragino Kaku": ("SimHei", "Hiragino Kaku Gothic ProN"),
-    "Noto Sans SC + Noto Sans JP": ("Noto Sans CJK SC", "Noto Sans CJK JP"),
-    "思源宋体 + Noto Serif JP": ("Source Han Serif SC", "Noto Serif CJK JP"),
-    "霞鹜文楷 + Zen 角ゴシック": ("LXGW WenKai", "Zen Kaku Gothic New"),
+    "雅黑 + Zen Kaku（稳重日系）": ("Microsoft YaHei", "Zen Kaku Gothic New"),
+    "雅黑 + Meiryo（B站烤肉）": ("Microsoft YaHei", "Meiryo"),
+    "雅黑 + 思源黑体 JP（最高可读）": ("Microsoft YaHei", "Source Han Sans JP"),
+    "霞鹜文楷 + 游明朝（抒情衬线）": ("LXGW WenKai", "Yu Mincho"),
+    "霞鹜文楷 + Zen Kaku（楷体中文）": ("LXGW WenKai", "Zen Kaku Gothic New"),
+    "等线 + M PLUS（梦幻轻飘）": ("DengXian", "M PLUS 1p"),
+    "等线 + 游ゴシック（清爽细黑）": ("DengXian", "Yu Gothic"),
+    "黑体 + 游ゴシック（现场硬朗）": ("SimHei", "Yu Gothic"),
+    "宋体 + 游明朝（电影衬线）": ("SimSun", "Yu Mincho"),
+    "M PLUS + Zen Kaku（轻快日系）": ("M PLUS 1p", "Zen Kaku Gothic New"),
+}
+
+# Short labels for the narrow preset cards; a full family name would be cut off.
+SHORT_FONT_NAMES: dict[str, str] = {
+    "Source Han Sans CN": "思源黑体 CN",
+    "Source Han Sans JP": "思源黑体 JP",
+    "LXGW WenKai": "霞鹜文楷",
+    "Zen Kaku Gothic New": "Zen Kaku",
+    "M PLUS 1p": "M PLUS",
+    "Yu Mincho": "游明朝",
+    "Yu Gothic": "游ゴシック",
+    "DengXian": "等线",
+    "SimHei": "黑体",
+    "SimSun": "宋体",
+    "Microsoft YaHei": "雅黑",
 }
 
 TIMELINE_LINES: tuple[tuple[str, str, str], ...] = (
@@ -112,8 +132,6 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         self._preview_stage_width = 0
         self._preset_removed: list[str] = []
         self._preset_renamed: dict[str, str] = {}
-        self._font_preview_window: ctk.CTkToplevel | None = None
-        self._font_preview_generation = 0
         self.font_pair_options = self._available_font_pair_options()
 
         self._load_presets()
@@ -762,6 +780,20 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             self.card_widgets.append(self._create_preset_card(self.preset_scroll, name, config))
         self._select_preset_silently(self.current_preset)
 
+    @staticmethod
+    def _short_font_name(family: str) -> str:
+        name = str(family or "").strip()
+        return SHORT_FONT_NAMES.get(name, name)
+
+    def _preset_card_subtitle(self, config: dict[str, Any]) -> str:
+        """Show the font pair and the tone: nine presets need to be told apart."""
+
+        ch_font = self._short_font_name(str(config.get("ch_font") or ""))
+        jp_font = self._short_font_name(str(config.get("jp_font") or ""))
+        tone = str(config.get("description") or "").strip() or "自定义排版预设"
+        pair = " + ".join(part for part in (ch_font, jp_font) if part)
+        return (f"{pair} · {tone}" if pair else tone)[:34]
+
     def _create_preset_card(self, parent, name: str, config: dict[str, Any]) -> ctk.CTkFrame:
         is_active = name == self.current_preset
         bg_color = "#112016" if is_active else UTASYNC_TOKENS.surface_sidebar
@@ -799,7 +831,7 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         ).pack(anchor="w")
         ctk.CTkLabel(
             text_frame,
-            text=str(config.get("description", "自定义排版预设"))[:28],
+            text=self._preset_card_subtitle(config),
             font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=9),
             text_color=UTASYNC_TOKENS.text_muted,
             justify="left",
@@ -986,125 +1018,27 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         self.preview_badge.configure(text="未保存预览")
 
     def _open_font_preview(self) -> None:
-        """Open one reusable window for a real ASS preview of the selected pair."""
+        """Show the selected pair through the shared font preview window."""
+
         pair = self._current_font_pair()
         if not pair:
             return
-
-        window = self._font_preview_window
-        if window is None or not window.winfo_exists():
-            window = ctk.CTkToplevel(self)
-            self._font_preview_window = window
-            window.title("UtaSyncNext - 字体预览")
-            window.transient(self)
-            apply_child_window_icon(window, self)
-            window.geometry("860x620")
-            window.minsize(720, 520)
-            window.configure(fg_color=UTASYNC_TOKENS.surface_app)
-
-            header = ctk.CTkFrame(window, fg_color="transparent")
-            header.pack(fill="x", padx=22, pady=(18, 8))
-            window._font_preview_title = ctk.CTkLabel(
-                header,
-                text="字体预览",
-                anchor="w",
-                font=ctk.CTkFont(family=UTASYNC_TOKENS.font_display, size=20, weight="bold"),
-                text_color=UTASYNC_TOKENS.text_primary,
-            )
-            window._font_preview_title.pack(side="left")
-            window._font_preview_status = ctk.CTkLabel(
-                header,
-                text="ASS 渲染中…",
-                anchor="e",
-                font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=10),
-                text_color=UTASYNC_TOKENS.text_hint,
-            )
-            window._font_preview_status.pack(side="right", pady=(4, 0))
-
-            window._font_preview_meta = ctk.CTkLabel(
-                window,
-                text="",
-                anchor="w",
-                justify="left",
-                font=ctk.CTkFont(family=UTASYNC_TOKENS.font_mono, size=10),
-                text_color=UTASYNC_TOKENS.text_secondary,
-            )
-            window._font_preview_meta.pack(fill="x", padx=22, pady=(0, 10))
-
-            stage = ctk.CTkFrame(
-                window,
-                fg_color=UTASYNC_TOKENS.surface_preview,
-                border_color=UTASYNC_TOKENS.border_cool,
-                border_width=1,
-                corner_radius=UTASYNC_TOKENS.radius_panel,
-            )
-            stage.pack(fill="both", expand=True, padx=22, pady=(0, 12))
-            window._font_preview_image_label = ctk.CTkLabel(stage, text="ASS 渲染中…")
-            window._font_preview_image_label.pack(fill="both", expand=True, padx=12, pady=12)
-
-            window._font_preview_sample = ctk.CTkLabel(
-                window,
-                text="",
-                anchor="w",
-                justify="left",
-                font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=10),
-                text_color=UTASYNC_TOKENS.text_hint,
-            )
-            window._font_preview_sample.pack(fill="x", padx=22, pady=(0, 16))
-
-            def close_preview() -> None:
-                self._font_preview_generation += 1
-                self._font_preview_window = None
-                try:
-                    window.destroy()
-                except Exception:
-                    pass
-
-            window.protocol("WM_DELETE_WINDOW", close_preview)
-        else:
-            window.deiconify()
-            window.lift()
-            window.focus_force()
-
         config = dict(ASS_PRESETS.get(self.current_preset, {}))
         try:
             config.update(self._read_manual_style())
         except (AttributeError, ValueError):
             pass
-        config["ch_font"], config["jp_font"] = pair
         timestamp, chinese, japanese = TIMELINE_LINES[getattr(self, "active_timeline_index", 0)]
-        self._font_preview_generation += 1
-        generation = self._font_preview_generation
-        window._font_preview_meta.configure(text=f"中文：{pair[0]}  ·  日文：{pair[1]}  ·  当前预设：{self.current_preset}")
-        window._font_preview_sample.configure(text=f"样例 {timestamp}   {chinese}  /  {japanese}")
-        window._font_preview_status.configure(text="ASS 渲染中…")
-        window._font_preview_image_label.configure(image=None, text="ASS 渲染中…")
-
-        def worker() -> None:
-            try:
-                image = render_ass_preview_frame(config, japanese, chinese)
-            except Exception as exc:
-                def failed() -> None:
-                    if generation != self._font_preview_generation or not window.winfo_exists():
-                        return
-                    window._font_preview_status.configure(text="预览失败")
-                    window._font_preview_image_label.configure(image=None, text=f"ASS 预览暂不可用：{exc}")
-                self.after(0, failed)
-                return
-
-            def display() -> None:
-                if generation != self._font_preview_generation or not window.winfo_exists():
-                    return
-                width = max(420, window._font_preview_image_label.winfo_width() - 24)
-                height = max(240, window._font_preview_image_label.winfo_height() - 24)
-                frame = ImageOps.contain(image.copy(), (width, height), method=Image.Resampling.LANCZOS)
-                preview_image = ctk.CTkImage(light_image=frame, dark_image=frame, size=frame.size)
-                window._font_preview_image = preview_image
-                window._font_preview_image_label.configure(image=preview_image, text="")
-                window._font_preview_status.configure(text="真实 ASS 预览")
-            self.after(0, display)
-
-        threading.Thread(target=worker, daemon=True).start()
+        FontPreviewWindow.show(
+            self,
+            config=config,
+            ch_font=pair[0],
+            jp_font=pair[1],
+            preset_name=self.current_preset,
+            chinese=chinese,
+            japanese=japanese,
+            sample_label=f"样例 {timestamp}",
+        )
 
     def _current_font_pair(self) -> tuple[str, str] | None:
         if hasattr(self, "ch_font_option") and hasattr(self, "jp_font_option"):
@@ -1566,12 +1500,7 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             print(f"保存花字预设失败: {exc}")
 
     def close_window(self) -> None:
-        if self._font_preview_window is not None:
-            try:
-                self._font_preview_window.destroy()
-            except Exception:
-                pass
-            self._font_preview_window = None
+        FontPreviewWindow.close_for(self)
         try:
             self.grab_release()
         except Exception:

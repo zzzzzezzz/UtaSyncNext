@@ -102,6 +102,7 @@ def main() -> int:
     _run_script(results, "performance-metrics", ["tools/smoke_performance_metrics.py"])
     _run_script(results, "ffmpeg-preflight", ["tools/smoke_ffmpeg_preflight.py"])
     _run_script(results, "preset-catalog", ["tools/smoke_preset_catalog.py"])
+    _run_script(results, "font-preview-window", ["tools/smoke_font_preview_window.py"])
     _run_script(results, "style-workbench-preview", ["tools/smoke_style_workbench_preview.py"])
     _run_script(results, "icon-assets", ["tools/smoke_icon_assets.py"])
     _run_script(results, "packaging-audit-policy", ["tools/smoke_packaging_audit.py"])

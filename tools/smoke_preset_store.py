@@ -83,7 +83,43 @@ def _pure_checks() -> dict[str, object]:
         path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
         saved, _meta = preset_store.read_preset_document(path)
         _require(not any(name.startswith("AI:") for name in saved), "旧 AI 配色没有被过滤")
-        return {"phase": "pure", "tombstones": True, "renames": True, "restore": True, "ai_filter": True}
+
+        # Pre-Next builds shipped every built-in with the same 雅黑 + Meiryo
+        # pair and wrote a full copy of the catalog to disk. Those copies must
+        # not keep overriding the shipped catalog, or the nine presets would
+        # stay lookalikes forever.
+        legacy = {}
+        for name, config in BUILTIN_PRESETS.items():
+            stale = {key: value for key, value in config.items() if key != "description"}
+            stale["ch_font"] = "Microsoft YaHei"
+            stale["jp_font"] = "Meiryo"
+            legacy[name] = stale
+        legacy["AI: 柔花幻彩"] = dict(legacy[RENAMED_FROM])
+        legacy_path = Path(temp_dir) / "legacy_presets.json"
+        legacy_path.write_text(json.dumps(legacy, ensure_ascii=False, indent=2), encoding="utf-8")
+        legacy_saved, legacy_meta = preset_store.read_preset_document(legacy_path)
+        migrated = preset_store.merge_presets(BUILTIN_PRESETS, legacy_saved, legacy_meta)
+        for name, config in BUILTIN_PRESETS.items():
+            _require(
+                migrated[name]["ch_font"] == config["ch_font"]
+                and migrated[name]["jp_font"] == config["jp_font"],
+                f"旧版同名快照盖住了新的内置字体：{name}",
+            )
+        _require(len(migrated) == len(BUILTIN_PRESETS), "旧版快照被错误地当成用户自建预设")
+
+        kept = dict(BUILTIN_PRESETS[RENAMED_FROM])
+        kept["ch_color"] = "#0A0A0A"
+        legacy_saved[RENAMED_FROM] = kept
+        merged_kept = preset_store.merge_presets(BUILTIN_PRESETS, legacy_saved, legacy_meta)
+        _require(merged_kept[RENAMED_FROM]["ch_color"] == "#0A0A0A", "带说明的用户改动被误删")
+        return {
+            "phase": "pure",
+            "tombstones": True,
+            "renames": True,
+            "restore": True,
+            "ai_filter": True,
+            "legacy_snapshot": True,
+        }
 
 
 def _phase(phase: str, sandbox_root: Path) -> dict[str, object]:

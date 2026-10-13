@@ -9,9 +9,7 @@ from core.ass_maker import ASSMaker, ASS_PRESETS
 from core.subtitle_policy import apply_layout_policy, policy_log_line, resolve_subtitle_layout
 from engine.cache_env import app_root, task_base_name
 from ui.ass_preview_window import AssPreviewWindow
-
-PREVIEW_SAMPLE_CHINESE = "在这光芒万丈的舞台上"
-PREVIEW_SAMPLE_JAPANESE = "この光り輝くステージの上で"
+from ui.font_preview_window import SAMPLE_CHINESE, SAMPLE_JAPANESE
 
 
 class AssActionRunner:
@@ -46,8 +44,8 @@ class AssActionRunner:
             dialog or self.host,
             config=config,
             preset_name=str(ass_choice),
-            chinese=PREVIEW_SAMPLE_CHINESE,
-            japanese=PREVIEW_SAMPLE_JAPANESE,
+            chinese=SAMPLE_CHINESE,
+            japanese=SAMPLE_JAPANESE,
             source_note=source_note,
         )
 

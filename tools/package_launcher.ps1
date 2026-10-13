@@ -21,6 +21,8 @@ $runtimeStateNames = @(
     "performance",
     "fonts",
     "user_settings.json"
+    "user_presets.json",
+    "user_font_pairs.json"
 )
 
 function Set-NextBuildCacheEnv {

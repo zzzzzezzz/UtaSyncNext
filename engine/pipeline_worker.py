@@ -975,7 +975,7 @@ def _format_schedule_summary(
 
 
 def _load_user_presets(ass_presets: dict[str, dict[str, Any]]) -> None:
-    preset_path = Path("user_presets.json")
+    preset_path = app_root() / "user_presets.json"
     if not preset_path.exists():
         return
     try:

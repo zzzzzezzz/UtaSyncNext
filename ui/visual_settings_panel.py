@@ -15,6 +15,7 @@ from ui.font_catalog import (
     import_fonts_from_directory,
     user_fonts_dir,
 )
+from ui.font_preview_window import FontPreviewWindow
 from ui.preset_store import load_presets_into
 from ui.sidebar_options import (
     ASPECT_RATIO_OPTIONS,
@@ -134,7 +135,16 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
             fg_color="#1F2A3A",
             hover_color="#2F3E55",
             command=self._open_user_fonts_dir,
-        ).grid(row=0, column=3)
+        ).grid(row=0, column=3, padx=(0, 6))
+        ctk.CTkButton(
+            font_actions,
+            text="预览字体",
+            width=74,
+            height=28,
+            fg_color="#1F2A3A",
+            hover_color="#2F3E55",
+            command=self._preview_fonts,
+        ).grid(row=0, column=4, padx=(0, 6))
         ctk.CTkButton(
             font_actions,
             text="刷新",
@@ -143,7 +153,7 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
             fg_color="#1F2A3A",
             hover_color="#2F3E55",
             command=self._refresh_font_options,
-        ).grid(row=0, column=4, padx=(6, 0))
+        ).grid(row=0, column=5)
         row += 1
         row = self._add_group("主字号 (中文) / 副字号 (日文)", row)
         size_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -387,6 +397,37 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
         self.opt_ch_font.set(self._format_font_display(current_ch))
         self.opt_jp_font.set(self._format_font_display(current_jp))
         self.font_catalog_hint.configure(text=self._font_catalog_hint())
+
+    def _effective_font(self, option: object, config: dict[str, Any], key: str) -> str:
+        """Use the hand-picked family, or fall back to the preset own font."""
+
+        chosen = self._clean_font_display(option.get())
+        if chosen and chosen != "跟随预设":
+            return chosen
+        return str(config.get(key) or "")
+
+    def _preview_fonts(self) -> None:
+        """Render the selected pair through the shared font preview window."""
+
+        preset_name = self.opt_ass_preset.get()
+        config = dict(ASS_PRESETS.get(preset_name) or ASS_PRESETS.get(DEFAULT_ASS_PRESET) or {})
+        ch_font = self._effective_font(self.opt_ch_font, config, "ch_font")
+        jp_font = self._effective_font(self.opt_jp_font, config, "jp_font")
+        if not ch_font or not jp_font:
+            messagebox.showinfo("提示", "请先选择中文和日文字体。", parent=self.winfo_toplevel())
+            return
+        follows_preset = (
+            self._clean_font_display(self.opt_ch_font.get()) == "跟随预设"
+            and self._clean_font_display(self.opt_jp_font.get()) == "跟随预设"
+        )
+        FontPreviewWindow.show(
+            self.winfo_toplevel(),
+            config=config,
+            ch_font=ch_font,
+            jp_font=jp_font,
+            preset_name="" if preset_name == ASS_DISABLED_OPTION else preset_name,
+            source_note="跟随预设字体" if follows_preset else "手动指定字体",
+        )
 
     def _import_user_font(self) -> None:
         selected = filedialog.askopenfilename(
