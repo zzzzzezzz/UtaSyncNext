@@ -167,7 +167,7 @@ Write-Host ""
 Write-Host "Launcher build complete:"
 Write-Host "  dist\UtaSyncNext\UtaSyncNext.exe"
 Write-Host ""
-Write-Host "Remember: .engine, models_faster, output, .cache, performance, and fonts are external runtime folders."
+Write-Host "Remember: .engine, models_faster, output, .cache, performance, and fonts are external runtime folders, and user_settings.json / user_presets.json / user_font_pairs.json keep the user state across rebuilds."
 
 & $pythonExe tools\check_packaging_size.py
 if ($LASTEXITCODE -ne 0) {

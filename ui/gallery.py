@@ -51,8 +51,8 @@ FONT_PAIR_OPTIONS: dict[str, tuple[str, str]] = {
 
 # Short labels for the narrow preset cards; a full family name would be cut off.
 SHORT_FONT_NAMES: dict[str, str] = {
-    "Source Han Sans CN": "思源黑体 CN",
-    "Source Han Sans JP": "思源黑体 JP",
+    "Source Han Sans CN": "思源CN",
+    "Source Han Sans JP": "思源JP",
     "LXGW WenKai": "霞鹜文楷",
     "Zen Kaku Gothic New": "Zen Kaku",
     "M PLUS 1p": "M PLUS",
@@ -786,13 +786,59 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         return SHORT_FONT_NAMES.get(name, name)
 
     def _preset_card_subtitle(self, config: dict[str, Any]) -> str:
-        """Show the font pair and the tone: nine presets need to be told apart."""
+        """Show the font pair: nine presets need to be told apart at a glance."""
 
         ch_font = self._short_font_name(str(config.get("ch_font") or ""))
         jp_font = self._short_font_name(str(config.get("jp_font") or ""))
-        tone = str(config.get("description") or "").strip() or "自定义排版预设"
         pair = " + ".join(part for part in (ch_font, jp_font) if part)
-        return (f"{pair} · {tone}" if pair else tone)[:34]
+        # The tone already sits in the preset name and in the line under the
+        # preview, so the narrow card spends its single line on the pair.
+        return pair or str(config.get("description") or "").strip() or "自定义排版预设"
+
+    def _card_subtitle_font(self) -> tkfont.Font:
+        font = getattr(self, "_subtitle_font", None)
+        if font is None:
+            font = tkfont.Font(family=UTASYNC_TOKENS.font_ui, size=9)
+            self._subtitle_font = font
+        return font
+
+    def _fit_text_to_width(self, text: str, available: int) -> str:
+        """Shorten text to the pixels it really gets, instead of guessing.
+
+        The sidebar can be widened and the family names differ in length, so a
+        fixed character cap either clips a long pair or wastes space on a short
+        one. An ellipsis keeps it obvious that something was shortened.
+        """
+
+        font = self._card_subtitle_font()
+        limit = max(24, available - 4)
+        if font.measure(text) <= limit:
+            return text
+        trimmed = text
+        while trimmed and font.measure(trimmed + "…") > limit:
+            trimmed = trimmed[:-1]
+        return f"{trimmed}…" if trimmed else "…"
+
+    def _bind_card_subtitle(self, label: ctk.CTkLabel, subtitle: str) -> None:
+        """Trim the card subtitle to the space the card really gives it.
+
+        Measuring the label itself would be circular: shortening the text shrinks
+        the label request, which then stops reporting a usable width. The frame
+        that holds it is sized by the card, so that is what gets measured.
+        """
+
+        holder = label.master
+
+        def fit(_event: object | None = None) -> None:
+            available = holder.winfo_width()
+            if available <= 40:
+                return
+            fitted = self._fit_text_to_width(subtitle, available)
+            if str(label.cget("text")) != fitted:
+                label.configure(text=fitted)
+
+        holder.bind("<Configure>", fit, add="+")
+        label.bind("<Configure>", fit, add="+")
 
     def _create_preset_card(self, parent, name: str, config: dict[str, Any]) -> ctk.CTkFrame:
         is_active = name == self.current_preset
@@ -829,14 +875,17 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             justify="left",
             anchor="w",
         ).pack(anchor="w")
-        ctk.CTkLabel(
+        subtitle = self._preset_card_subtitle(config)
+        subtitle_label = ctk.CTkLabel(
             text_frame,
-            text=self._preset_card_subtitle(config),
+            text=subtitle,
             font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=9),
             text_color=UTASYNC_TOKENS.text_muted,
             justify="left",
             anchor="w",
-        ).pack(anchor="w", pady=(2, 0))
+        )
+        subtitle_label.pack(anchor="w", pady=(2, 0))
+        self._bind_card_subtitle(subtitle_label, subtitle)
         card.bind("<Button-1>", select)
         return card
 
