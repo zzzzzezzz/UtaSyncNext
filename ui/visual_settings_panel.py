@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import json
 import os
-from pathlib import Path
 from tkinter import filedialog, font as tkfont, messagebox
 from typing import Any, Callable
 
 import customtkinter as ctk
 
-from core.ass_maker import ASS_PRESETS
+from core.ass_maker import ASS_PRESETS, BUILTIN_PRESETS
 from ui.constants import CURATED_FONT_FAMILIES, FONT_ALIAS_MAP
 from ui.font_catalog import (
     discover_user_fonts,
@@ -17,6 +15,7 @@ from ui.font_catalog import (
     import_fonts_from_directory,
     user_fonts_dir,
 )
+from ui.preset_store import load_presets_into
 from ui.sidebar_options import (
     ASPECT_RATIO_OPTIONS,
     ASS_DISABLED_OPTION,
@@ -279,18 +278,26 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
     def open_style_gallery(self) -> None:
         from ui.gallery import StyleGalleryWindow
 
-        def on_preset_selected(preset_name: str) -> None:
-            options = [ASS_DISABLED_OPTION] + list(ASS_PRESETS.keys())
-            self.opt_ass_preset.configure(values=options)
-            self.opt_ass_preset.set(preset_name)
-
         StyleGalleryWindow(
             master=self.winfo_toplevel(),
             current_preset=self.opt_ass_preset.get(),
-            apply_callback=on_preset_selected,
+            apply_callback=self._refresh_ass_preset_options,
             get_settings_cb=self.get_settings_cb,
             sync_presets_cb=self.sync_presets_cb,
+            refresh_presets_cb=self._refresh_ass_preset_options,
         )
+
+    def _refresh_ass_preset_options(self, preset_name: str | None = None) -> None:
+        """Rebuild the preset dropdown after edits, deletions or renames."""
+
+        options = [ASS_DISABLED_OPTION] + list(ASS_PRESETS.keys())
+        self.opt_ass_preset.configure(values=options)
+        candidate = preset_name or self.opt_ass_preset.get()
+        if candidate in options:
+            self.opt_ass_preset.set(candidate)
+            return
+        real_presets = [name for name in options if name != ASS_DISABLED_OPTION]
+        self.opt_ass_preset.set(real_presets[0] if real_presets else ASS_DISABLED_OPTION)
 
     def _add_group(self, text: str, row: int) -> int:
         ctk.CTkLabel(
@@ -430,12 +437,4 @@ class VisualSettingsPanel(ctk.CTkScrollableFrame):
             messagebox.showerror("字体导入失败", str(exc), parent=self.winfo_toplevel())
 
     def _load_user_presets(self) -> None:
-        preset_file = Path("user_presets.json")
-        if not preset_file.exists():
-            return
-        try:
-            data = json.loads(preset_file.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and data:
-                ASS_PRESETS.update({name: value for name, value in data.items() if not str(name).startswith("AI:")})
-        except Exception:
-            pass
+        load_presets_into(ASS_PRESETS, defaults=BUILTIN_PRESETS)

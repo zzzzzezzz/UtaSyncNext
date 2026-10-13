@@ -102,11 +102,15 @@ def _phase(phase: str, sandbox_root: Path) -> dict[str, object]:
             _find_button(gallery, "保存命名搭配").invoke()
             _require(load_user_font_pairs().get(PAIR_NAME) == (CH_FONT, JP_FONT), "搭配没有保存")
             _find_button(gallery, "展开编辑").invoke()
-            deadline = time.monotonic() + 3
-            while gallery._editor_animating and time.monotonic() < deadline:
+            settle = time.monotonic() + 1
+            while time.monotonic() < settle:
                 root.update()
                 time.sleep(0.02)
-            _require(not gallery._editor_animating, "样式编辑区展开超时")
+            _require(gallery.editor_body.winfo_manager() != "", "样式编辑区没有展开")
+            _require(
+                str(gallery.editor_toggle_btn.cget("text")) == "收起编辑",
+                "展开后按钮文案不正确",
+            )
             _find_button(gallery, "另存为新预设").invoke()
             _require(ASS_PRESETS[DEFAULT_PRESET] == baseline, "另存时覆盖了原预设")
             created = ASS_PRESETS.get(STYLE_NAME, {})

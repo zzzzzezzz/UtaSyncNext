@@ -1,23 +1,35 @@
 from __future__ import annotations
 
-import json
 import threading
-from pathlib import Path
 from tkinter import colorchooser, font as tkfont, messagebox, simpledialog
 from typing import Any, Callable
 
 import customtkinter as ctk
 from PIL import Image, ImageOps
 
-from core.ass_maker import ASS_PRESETS
+from core.ass_maker import ASS_PRESETS, BUILTIN_PRESETS
 from ui.ass_preview_frame import render_ass_preview_frame
 from ui.design_tokens import UTASYNC_TOKENS
 from ui.font_catalog import discover_user_fonts, load_user_font_pairs, save_user_font_pairs
+from ui.preset_store import (
+    load_presets_into,
+    restore_builtin_presets,
+    write_preset_document,
+)
 from ui.theme import ACCENT_GREEN, ACCENT_WARNING, BG_WORKSPACE, TEXT_TITLE
 from ui.window_icon import apply_child_window_icon
 
+# Compact style editor heights: the collapsed header row and the header's own
+# height, used to size the panel from its content instead of a fixed guess.
+EDITOR_COLLAPSED_HEIGHT = 48
+EDITOR_HEADER_HEIGHT = 44
+
 FONT_PAIR_OPTIONS: dict[str, tuple[str, str]] = {
     "雅黑 + Meiryo（默认）": ("Microsoft YaHei", "Meiryo"),
+    "思源黑体双语（现代清晰）": ("Source Han Sans CN", "Source Han Sans JP"),
+    "M PLUS + Zen Kaku（轻快日系）": ("M PLUS 1p", "Zen Kaku Gothic New"),
+    "雅黑 + Zen Kaku（稳重日系）": ("Microsoft YaHei", "Zen Kaku Gothic New"),
+    "思源黑体 + Meiryo（高可读）": ("Source Han Sans CN", "Meiryo"),
     "思源黑体 + Noto Sans JP": ("Source Han Sans SC", "Noto Sans JP"),
     "等线 + 游ゴシック": ("DengXian", "Yu Gothic"),
     "黑体 + Hiragino Kaku": ("SimHei", "Hiragino Kaku Gothic ProN"),
@@ -51,6 +63,7 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         apply_callback: Callable[[str], object],
         get_settings_cb: Callable[[], dict[str, Any]],
         sync_presets_cb: Callable[[], object],
+        refresh_presets_cb: Callable[[str | None], object] | None = None,
     ) -> None:
         if getattr(self, "_initialized", False):
             self._owner_window = master
@@ -59,8 +72,12 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             self.apply_callback = apply_callback
             self.get_settings_cb = get_settings_cb
             self.sync_presets_cb = sync_presets_cb
+            self.refresh_presets_cb = refresh_presets_cb
             self._refresh_font_catalog()
-            self._select_preset_silently(current_preset)
+            fallback = next(iter(ASS_PRESETS), current_preset)
+            self._select_preset_silently(
+                current_preset if current_preset in ASS_PRESETS else fallback
+            )
             self._show_window()
             return
 
@@ -79,12 +96,15 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         self.apply_callback = apply_callback
         self.get_settings_cb = get_settings_cb
         self.sync_presets_cb = sync_presets_cb
+        self.refresh_presets_cb = refresh_presets_cb
         self.current_preset = current_preset
         self.card_widgets: list[ctk.CTkFrame] = []
         self._preview_generation = 0
         self._preview_image: ctk.CTkImage | None = None
-        self._editor_animation_after: str | None = None
-        self._editor_animating = False
+        self._preset_removed: list[str] = []
+        self._preset_renamed: dict[str, str] = {}
+        self._font_preview_window: ctk.CTkToplevel | None = None
+        self._font_preview_generation = 0
         self.font_pair_options = self._available_font_pair_options()
 
         self._load_presets()
@@ -150,6 +170,7 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         """Add a small set of explicit user-font pairs without growing a font matrix."""
         if not families:
             return {}
+        curated_pairs = set(FONT_PAIR_OPTIONS.values())
         lower = {name: name.casefold() for name in families}
         cn = [name for name in families if any(token in lower[name] for token in (" cn", " sc", "chinese", "中文"))]
         jp = [name for name in families if any(token in lower[name] for token in (" jp", " japanese", "日", "gothic"))]
@@ -163,9 +184,11 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             ("Source Han Sans CN", "Source Han Sans JP", "用户：思源黑体 CN + JP"),
         )
         for ch_font, jp_font, label in preferred_pairs:
-            if ch_font in families and jp_font in families:
+            if ch_font in families and jp_font in families and (ch_font, jp_font) not in curated_pairs:
                 pairs[label] = (ch_font, jp_font)
         for ch_font, jp_font in zip(cn[:2], jp[:2]):
+            if (ch_font, jp_font) in curated_pairs:
+                continue
             label = f"用户：{ch_font} + {jp_font}"
             pairs.setdefault(label, (ch_font, jp_font))
         return pairs
@@ -222,6 +245,17 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=10),
             text_color=UTASYNC_TOKENS.text_hint,
         ).pack(fill="x", padx=14, pady=(0, 8))
+        self.restore_presets_btn = ctk.CTkButton(
+            self.sidebar,
+            text="恢复默认预设",
+            height=26,
+            font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=10),
+            fg_color=UTASYNC_TOKENS.surface_control,
+            hover_color=UTASYNC_TOKENS.surface_control_hover,
+            text_color=UTASYNC_TOKENS.text_secondary,
+            command=self._restore_default_presets,
+        )
+        self.restore_presets_btn.pack(fill="x", padx=14, pady=(0, 8))
         self.preset_scroll = ctk.CTkScrollableFrame(
             self.sidebar,
             fg_color="transparent",
@@ -302,6 +336,16 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             hover_color=UTASYNC_TOKENS.surface_control_hover,
             command=self._refresh_font_catalog,
         ).pack(side="left")
+        self.font_preview_btn = ctk.CTkButton(
+            self.font_panel,
+            text="预览当前字体",
+            height=28,
+            font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=10),
+            fg_color=UTASYNC_TOKENS.surface_control,
+            hover_color=UTASYNC_TOKENS.surface_control_hover,
+            command=self._open_font_preview,
+        )
+        self.font_preview_btn.pack(fill="x", padx=10, pady=(0, 7))
         pair_manage_actions = ctk.CTkFrame(self.font_panel, fg_color="transparent")
         pair_manage_actions.pack(fill="x", padx=10, pady=(0, 6))
         self.rename_pair_btn = ctk.CTkButton(
@@ -478,6 +522,17 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             text_color=UTASYNC_TOKENS.text_secondary,
             command=lambda: self._select_preset(self.current_preset),
         ).pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.rename_current_btn = ctk.CTkButton(
+            actions,
+            text="重命名预设",
+            width=100,
+            height=32,
+            fg_color=UTASYNC_TOKENS.surface_control,
+            hover_color=UTASYNC_TOKENS.surface_control_hover,
+            text_color=UTASYNC_TOKENS.text_secondary,
+            command=self._rename_current_preset,
+        )
+        self.rename_current_btn.pack(side="right", padx=(0, 8))
         self.delete_current_btn = ctk.CTkButton(
             actions,
             text="删除预设",
@@ -552,7 +607,7 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             border_color=UTASYNC_TOKENS.border_cool,
             border_width=1,
             corner_radius=UTASYNC_TOKENS.radius_panel,
-            height=48,
+            height=EDITOR_COLLAPSED_HEIGHT,
         )
         self.editor_panel.pack(fill="x", pady=(12, 0))
         self.editor_panel.pack_propagate(False)
@@ -848,6 +903,127 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         )
         self.preview_badge.configure(text="未保存预览")
 
+    def _open_font_preview(self) -> None:
+        """Open one reusable window for a real ASS preview of the selected pair."""
+        pair = self._current_font_pair()
+        if not pair:
+            return
+
+        window = self._font_preview_window
+        if window is None or not window.winfo_exists():
+            window = ctk.CTkToplevel(self)
+            self._font_preview_window = window
+            window.title("UtaSyncNext - 字体预览")
+            window.transient(self)
+            apply_child_window_icon(window, self)
+            window.geometry("860x620")
+            window.minsize(720, 520)
+            window.configure(fg_color=UTASYNC_TOKENS.surface_app)
+
+            header = ctk.CTkFrame(window, fg_color="transparent")
+            header.pack(fill="x", padx=22, pady=(18, 8))
+            window._font_preview_title = ctk.CTkLabel(
+                header,
+                text="字体预览",
+                anchor="w",
+                font=ctk.CTkFont(family=UTASYNC_TOKENS.font_display, size=20, weight="bold"),
+                text_color=UTASYNC_TOKENS.text_primary,
+            )
+            window._font_preview_title.pack(side="left")
+            window._font_preview_status = ctk.CTkLabel(
+                header,
+                text="ASS 渲染中…",
+                anchor="e",
+                font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=10),
+                text_color=UTASYNC_TOKENS.text_hint,
+            )
+            window._font_preview_status.pack(side="right", pady=(4, 0))
+
+            window._font_preview_meta = ctk.CTkLabel(
+                window,
+                text="",
+                anchor="w",
+                justify="left",
+                font=ctk.CTkFont(family=UTASYNC_TOKENS.font_mono, size=10),
+                text_color=UTASYNC_TOKENS.text_secondary,
+            )
+            window._font_preview_meta.pack(fill="x", padx=22, pady=(0, 10))
+
+            stage = ctk.CTkFrame(
+                window,
+                fg_color=UTASYNC_TOKENS.surface_preview,
+                border_color=UTASYNC_TOKENS.border_cool,
+                border_width=1,
+                corner_radius=UTASYNC_TOKENS.radius_panel,
+            )
+            stage.pack(fill="both", expand=True, padx=22, pady=(0, 12))
+            window._font_preview_image_label = ctk.CTkLabel(stage, text="ASS 渲染中…")
+            window._font_preview_image_label.pack(fill="both", expand=True, padx=12, pady=12)
+
+            window._font_preview_sample = ctk.CTkLabel(
+                window,
+                text="",
+                anchor="w",
+                justify="left",
+                font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=10),
+                text_color=UTASYNC_TOKENS.text_hint,
+            )
+            window._font_preview_sample.pack(fill="x", padx=22, pady=(0, 16))
+
+            def close_preview() -> None:
+                self._font_preview_generation += 1
+                self._font_preview_window = None
+                try:
+                    window.destroy()
+                except Exception:
+                    pass
+
+            window.protocol("WM_DELETE_WINDOW", close_preview)
+        else:
+            window.deiconify()
+            window.lift()
+            window.focus_force()
+
+        config = dict(ASS_PRESETS.get(self.current_preset, {}))
+        try:
+            config.update(self._read_manual_style())
+        except (AttributeError, ValueError):
+            pass
+        config["ch_font"], config["jp_font"] = pair
+        timestamp, chinese, japanese = TIMELINE_LINES[getattr(self, "active_timeline_index", 0)]
+        self._font_preview_generation += 1
+        generation = self._font_preview_generation
+        window._font_preview_meta.configure(text=f"中文：{pair[0]}  ·  日文：{pair[1]}  ·  当前预设：{self.current_preset}")
+        window._font_preview_sample.configure(text=f"样例 {timestamp}   {chinese}  /  {japanese}")
+        window._font_preview_status.configure(text="ASS 渲染中…")
+        window._font_preview_image_label.configure(image=None, text="ASS 渲染中…")
+
+        def worker() -> None:
+            try:
+                image = render_ass_preview_frame(config, japanese, chinese)
+            except Exception as exc:
+                def failed() -> None:
+                    if generation != self._font_preview_generation or not window.winfo_exists():
+                        return
+                    window._font_preview_status.configure(text="预览失败")
+                    window._font_preview_image_label.configure(image=None, text=f"ASS 预览暂不可用：{exc}")
+                self.after(0, failed)
+                return
+
+            def display() -> None:
+                if generation != self._font_preview_generation or not window.winfo_exists():
+                    return
+                width = max(420, window._font_preview_image_label.winfo_width() - 24)
+                height = max(240, window._font_preview_image_label.winfo_height() - 24)
+                frame = ImageOps.contain(image.copy(), (width, height), method=Image.Resampling.LANCZOS)
+                preview_image = ctk.CTkImage(light_image=frame, dark_image=frame, size=frame.size)
+                window._font_preview_image = preview_image
+                window._font_preview_image_label.configure(image=preview_image, text="")
+                window._font_preview_status.configure(text="真实 ASS 预览")
+            self.after(0, display)
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def _current_font_pair(self) -> tuple[str, str] | None:
         if hasattr(self, "ch_font_option") and hasattr(self, "jp_font_option"):
             ch_font = self.ch_font_option.get().strip()
@@ -1021,58 +1197,32 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         ASS_PRESETS[self.current_preset]["ch_font"] = pair[0]
         ASS_PRESETS[self.current_preset]["jp_font"] = pair[1]
         self._save_presets()
-        self.sync_presets_cb()
+        self._notify_presets_changed()
         self._select_preset(self.current_preset)
 
     def _toggle_editor(self) -> None:
-        if self._editor_animating:
-            return
+        """Show or hide the manual controls in a single step.
+
+        The old version animated the panel height in 16 ms steps, which made the
+        scroll area jitter and clipped the controls for a few frames.
+        """
         if self.editor_body.winfo_manager():
-            self.editor_toggle_btn.configure(state="disabled")
-            self._animate_editor_height(48, collapse=True)
+            self.editor_body.pack_forget()
+            self.editor_panel.configure(height=EDITOR_COLLAPSED_HEIGHT)
+            self.editor_toggle_btn.configure(text="展开编辑")
             return
         self.editor_body.pack(fill="x", expand=False)
         self._load_editor_values()
-        self.editor_toggle_btn.configure(text="收起编辑", state="disabled")
-        self._animate_editor_height(260)
+        self.editor_panel.configure(height=self._editor_expanded_height())
+        self.editor_toggle_btn.configure(text="收起编辑")
+        self.after_idle(self._reveal_editor)
 
-    def _animate_editor_height(self, target: int, *, collapse: bool = False) -> None:
-        """Resize the compact editor in short steps so the scroll area stays readable."""
-        if self._editor_animation_after is not None:
-            try:
-                self.after_cancel(self._editor_animation_after)
-            except Exception:
-                pass
-            self._editor_animation_after = None
-        self._editor_animating = True
-        start = max(48, int(self.editor_panel.winfo_height() or 48))
-        distance = target - start
-        steps = max(1, min(12, abs(distance) // 16))
-        step = 0
+    def _editor_expanded_height(self) -> int:
+        """Size the panel from its real content instead of a magic number."""
 
-        def tick() -> None:
-            nonlocal step
-            step += 1
-            progress = step / steps
-            # Smoothstep keeps the first and last frames from snapping.
-            eased = progress * progress * (3 - 2 * progress)
-            height = round(start + distance * eased)
-            self.editor_panel.configure(height=height)
-            self.update_idletasks()
-            if step < steps:
-                self._editor_animation_after = self.after(16, tick)
-                return
-            self._editor_animation_after = None
-            self._editor_animating = False
-            self.editor_panel.configure(height=target)
-            if collapse:
-                self.editor_body.pack_forget()
-                self.editor_toggle_btn.configure(text="展开编辑", state="normal")
-            else:
-                self.editor_toggle_btn.configure(text="收起编辑", state="normal")
-                self.after_idle(self._reveal_editor)
-
-        tick()
+        self.update_idletasks()
+        body = int(self.editor_body.winfo_reqheight())
+        return max(EDITOR_COLLAPSED_HEIGHT + 24, body + EDITOR_HEADER_HEIGHT)
 
     def _reveal_editor(self) -> None:
         try:
@@ -1129,7 +1279,7 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             return
         ASS_PRESETS[self.current_preset].update(self._read_manual_style())
         self._save_presets()
-        self.sync_presets_cb()
+        self._notify_presets_changed()
         self._select_preset(self.current_preset)
         self.preview_badge.configure(text="已保存")
         self.summary_state.configure(text="已保存并同步", text_color=UTASYNC_TOKENS.accent_primary)
@@ -1158,7 +1308,7 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         base["description"] = "手动编辑的字幕样式"
         ASS_PRESETS[name] = base
         self._save_presets()
-        self.sync_presets_cb()
+        self._notify_presets_changed()
         self._populate_cards()
         self._select_preset(name)
         self.preview_badge.configure(text="新预设已保存")
@@ -1240,38 +1390,106 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         if not messagebox.askyesno("删除确认", f"确定要永久删除【{preset_name}】吗？", parent=self):
             return
         ASS_PRESETS.pop(preset_name, None)
+        # 内置预设要留一条"已删除"记录，否则下次启动会被默认值合并回来。
+        if preset_name in BUILTIN_PRESETS and preset_name not in self._preset_removed:
+            self._preset_removed.append(preset_name)
+        self._reset_rename_for(preset_name)
         self._save_presets()
-        self.sync_presets_cb()
         if card in self.card_widgets:
             self.card_widgets.remove(card)
         card.destroy()
         self.preset_count_label.configure(text=f"{len(ASS_PRESETS)} 套")
         if self.current_preset == preset_name:
             self._select_preset(next(iter(ASS_PRESETS.keys())))
+        self._notify_presets_changed()
+
+    def _rename_current_preset(self) -> None:
+        """Rename the selected preset; built-in renames must survive a restart."""
+
+        old_name = self.current_preset
+        if old_name not in ASS_PRESETS:
+            return
+        new_name = simpledialog.askstring(
+            "重命名预设", "新的预设名称：", initialvalue=old_name, parent=self
+        )
+        if not new_name:
+            return
+        new_name = str(new_name).strip()
+        if not new_name or new_name == old_name:
+            return
+        if new_name in ASS_PRESETS:
+            messagebox.showwarning("名称已存在", "请换一个预设名称。", parent=self)
+            return
+        ASS_PRESETS[new_name] = ASS_PRESETS.pop(old_name)
+        self._reset_rename_for(old_name)
+        if old_name in BUILTIN_PRESETS:
+            self._preset_renamed[old_name] = new_name
+        self.current_preset = new_name
+        self._save_presets()
+        self._populate_cards()
+        self._select_preset(new_name)
+        self.preview_badge.configure(text="已重命名")
+
+    def _restore_default_presets(self) -> None:
+        """Bring back deleted or renamed built-ins, keeping user-authored presets."""
+
+        if not messagebox.askyesno(
+            "恢复默认预设",
+            "将恢复被删除或改名的内置预设（连同自定义颜色一起还原），并保留你自己另存的预设。继续吗？",
+            parent=self,
+        ):
+            return
+        restored = restore_builtin_presets(
+            BUILTIN_PRESETS,
+            ASS_PRESETS,
+            {"removed": self._preset_removed, "renamed": self._preset_renamed},
+        )
+        ASS_PRESETS.clear()
+        ASS_PRESETS.update(restored)
+        self._preset_removed = []
+        self._preset_renamed = {}
+        self._save_presets()
+        self._populate_cards()
+        self._select_preset(next(iter(ASS_PRESETS)))
+        self.preview_badge.configure(text="已恢复默认")
+
+    def _reset_rename_for(self, name: str) -> None:
+        """Drop rename records touching ``name`` so reloads cannot duplicate it."""
+
+        for old, new in list(self._preset_renamed.items()):
+            if old == name or new == name:
+                self._preset_renamed.pop(old, None)
+
+    def _notify_presets_changed(self) -> None:
+        self.sync_presets_cb()
+        refresh = self.refresh_presets_cb
+        if callable(refresh):
+            refresh(self.current_preset if self.current_preset in ASS_PRESETS else None)
 
     def _load_presets(self) -> None:
-        for name in list(ASS_PRESETS):
-            if str(name).startswith("AI:"):
-                ASS_PRESETS.pop(name, None)
-        preset_file = Path("user_presets.json")
-        if not preset_file.exists():
-            return
-        try:
-            data = json.loads(preset_file.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and data:
-                # AI-generated presets from the old experiment are not part of
-                # the manual workflow; keep user-authored presets only.
-                ASS_PRESETS.update({name: value for name, value in data.items() if not str(name).startswith("AI:")})
-        except Exception as exc:
-            print(f"读取本地花字预设失败: {exc}")
+        meta = load_presets_into(ASS_PRESETS, defaults=BUILTIN_PRESETS)
+        self._preset_removed = list(meta.get("removed") or [])
+        self._preset_renamed = dict(meta.get("renamed") or {})
+        if self.current_preset not in ASS_PRESETS:
+            self.current_preset = next(iter(ASS_PRESETS))
 
     def _save_presets(self) -> None:
         try:
-            Path("user_presets.json").write_text(json.dumps(ASS_PRESETS, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception as exc:
+            write_preset_document(
+                ASS_PRESETS,
+                removed=self._preset_removed,
+                renamed=self._preset_renamed,
+            )
+        except OSError as exc:
             print(f"保存花字预设失败: {exc}")
 
     def close_window(self) -> None:
+        if self._font_preview_window is not None:
+            try:
+                self._font_preview_window.destroy()
+            except Exception:
+                pass
+            self._font_preview_window = None
         try:
             self.grab_release()
         except Exception:

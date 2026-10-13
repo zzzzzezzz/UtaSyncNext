@@ -23,15 +23,27 @@ RENDER_WIDTH = 1920
 RENDER_HEIGHT = 1080
 
 
-def render_ass_preview_frame(config: dict[str, Any], japanese: str, chinese: str) -> Image.Image:
-    """Use the same ASSMaker and libass path as export, on a neutral 16:9 frame.
+def render_ass_preview_frame(
+    config: dict[str, Any],
+    japanese: str,
+    chinese: str,
+    *,
+    output_size: tuple[int, int] | None = None,
+) -> Image.Image:
+    """Use the same ASSMaker and libass path as export, on a neutral frame.
 
     The temporary directory is scoped to the render, never the user's output.
     The sample is deliberately Japanese-first, matching the ASSMaker's SRT input.
+
+    ``output_size`` only changes the pixel size of the returned frame. The ASS
+    canvas always stays at the resolved export resolution because font sizes are
+    relative to PlayResY; a preview window asks for the export size so the frame
+    can be zoomed to 1:1, while the small workbench card keeps the cheap default.
     """
     ffmpeg = inspect_ffmpeg().get("ffmpeg")
     if not ffmpeg:
         raise FileNotFoundError("未检测到 FFmpeg，无法显示真实 ASS 预览")
+    frame_width, frame_height = output_size or (PREVIEW_WIDTH, PREVIEW_HEIGHT)
 
     with tempfile.TemporaryDirectory(prefix="utasync-ass-preview-") as tmp:
         temp_root = Path(tmp)
@@ -62,7 +74,7 @@ def render_ass_preview_frame(config: dict[str, Any], japanese: str, chinese: str
                 f"color=c=0x050505:s={preview_config['resolution_x']}x{preview_config['resolution_y']}:r=1:d=3",
                 "-vf",
                 f"subtitles={ass_path.name}{fonts_filter}"
-                f",scale={PREVIEW_WIDTH}:{PREVIEW_HEIGHT}:flags=lanczos",
+                f",scale={int(frame_width)}:{int(frame_height)}:flags=lanczos",
                 "-ss", "1.0", "-frames:v", "1", "-f", "image2pipe", "-vcodec", "png", "-",
             ],
             cwd=temp_root,

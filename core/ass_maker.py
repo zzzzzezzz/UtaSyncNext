@@ -125,6 +125,14 @@ ASS_PRESETS: dict[str, dict[str, Any]] = {
 }
 
 
+# Pristine copy of the built-ins.  User edits, renames and deletions are layered
+# on top of this snapshot when the user preset file is loaded, so a deleted
+# built-in preset cannot silently reappear on the next launch.
+BUILTIN_PRESETS: dict[str, dict[str, Any]] = {
+    name: dict(config) for name, config in ASS_PRESETS.items()
+}
+
+
 @dataclass(frozen=True)
 class SubtitleBlock:
     start_ass: str
