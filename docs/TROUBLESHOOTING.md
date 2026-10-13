@@ -67,6 +67,26 @@ ffprobe -version
 
 如果 `where.exe` 没有结果，请安装 FFmpeg 并把其 `bin` 目录加入启动 UtaSyncNext 的进程 `PATH`。仅在另一个终端改 PATH 不会改变已经运行的 GUI 进程。
 
+### 双击后没有任何反应
+
+启动器每次运行都会在 exe 同目录追加一行 `launcher_startup.log`：
+
+```text
+2026-10-13 17:52:03 pid=1234 started
+2026-10-13 17:53:11 pid=5678 second launch raised=True
+```
+
+- 文件里没有对应时间的那一行：exe 根本没跑到 Python，先确认双击的是
+  `dist\UtaSyncNext\UtaSyncNext.exe`，而不是桌面上的 V3 快捷方式（V3 快捷方式指向
+  `E:\UtaSync_V3.0_满血免安装版`）。
+- `started`：这次是正常启动。
+- `second launch raised=True`：已经有一个实例在跑，启动器把它的窗口恢复到前台；
+  如果系统拒绝置前，它会短暂置顶并闪烁任务栏按钮。第二个进程随即自行退出。
+- `second launch raised=False`：锁被一个没有窗口的进程占用（通常是上次崩溃或被强杀
+  留下的僵尸进程），在任务管理器结束 `UtaSyncNext.exe` 后重新启动。
+
+启动阶段崩溃会另外写 `launcher_crash.log`，位置同样是 exe 同目录。
+
 ## 模型、CUDA 和 Demucs
 
 ### “本地未找到 Faster-Whisper 模型”

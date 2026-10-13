@@ -21,8 +21,12 @@ def main() -> None:
 
     instance_lock = SingleInstanceLock.acquire()
     if instance_lock is None:
-        _show_already_running_message()
+        raised = focus_window_by_title()
+        _startup_log(f"second launch raised={raised}")
+        if not raised:
+            _show_already_running_message()
         return
+    _startup_log("started")
 
     try:
         import customtkinter as ctk
@@ -50,16 +54,31 @@ def main() -> None:
         instance_lock.release()
 
 
-def _show_already_running_message() -> None:
-    """Handle a second launch: wake the running window, or explain the dead end.
+def _startup_log(message: str) -> None:
+    """Append one line about this launch so a silent failure leaves evidence.
 
-    A launcher that is stuck without a window (a killed GUI thread, a crashed
-    mainloop) still holds the instance lock, and from here that looks exactly
-    like a healthy instance. When no window can be found the message names the
-    recovery instead of leaving the user with an app that will not open.
+    "Double-clicking does nothing" cannot be diagnosed from the outside: a
+    launcher that exited on the instance lock looks exactly like one that never
+    started. The file is append-only, tiny, and sits next to the crash log.
     """
-    if focus_window_by_title():
-        return
+    try:
+        path = app_root() / "launcher_startup.log"
+        stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(f"{stamp} pid={os.getpid()} {message}\n")
+    except Exception:
+        # Diagnostics must never be the reason a launch fails.
+        pass
+
+
+def _show_already_running_message() -> None:
+    """Explain a launch that could not reach any window.
+
+    The caller already tried to wake a running window. Reaching this means the
+    lock belongs to a process without a window (a killed GUI thread, a crashed
+    mainloop), so the message names the recovery instead of leaving the user
+    with an app that will not open.
+    """
     text = (
         "UtaSyncNext 已经在运行，但没有找到它的窗口。\n\n"
         "请在任务管理器里结束 UtaSyncNext.exe 后重新启动。"

@@ -7,6 +7,10 @@ does not do that for us: the second process does not own that window, and
 window. Attaching the calling thread to the foreground thread's input queue is
 the documented way around that restriction, which is what
 :func:`focus_window_by_title` does.
+
+When activation is still refused - another desktop, a locked workstation, a
+process in a different session - the window is pinned on top for a moment and
+its taskbar button is flashed, so a launch never looks like it did nothing.
 """
 
 from __future__ import annotations
@@ -18,6 +22,13 @@ WINDOW_TITLE = "UtaSyncNext"
 
 _SW_SHOW = 5
 _SW_RESTORE = 9
+_SWP_NOSIZE = 0x0001
+_SWP_NOMOVE = 0x0002
+_SWP_SHOWWINDOW = 0x0040
+_HWND_TOPMOST = -1
+_HWND_NOTOPMOST = -2
+_FLASHW_ALL = 0x00000003
+_FLASHW_TIMERNOFG = 0x0000000C
 
 
 def focus_window_by_title(title: str = WINDOW_TITLE) -> bool:
@@ -85,7 +96,34 @@ def _raise_window(hwnd: int) -> bool:
     finally:
         if attached:
             user32.AttachThreadInput(current_thread, foreground_thread, False)
+
+    if user32.GetForegroundWindow() == hwnd:
+        return True
+    # Windows refused the activation. Show the window anyway and flash its
+    # taskbar button rather than returning silently.
+    user32.SetWindowPos(
+        hwnd, _HWND_TOPMOST, 0, 0, 0, 0, _SWP_NOMOVE | _SWP_NOSIZE | _SWP_SHOWWINDOW
+    )
+    user32.SetWindowPos(hwnd, _HWND_NOTOPMOST, 0, 0, 0, 0, _SWP_NOMOVE | _SWP_NOSIZE)
+    _flash_taskbar(user32, hwnd)
     return bool(user32.IsWindow(hwnd)) and bool(user32.IsWindowVisible(hwnd))
+
+
+def _flash_taskbar(user32, hwnd: int) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    class _FlashInfo(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.UINT),
+            ("hwnd", wintypes.HWND),
+            ("dwFlags", wintypes.DWORD),
+            ("uCount", wintypes.UINT),
+            ("dwTimeout", wintypes.DWORD),
+        ]
+
+    info = _FlashInfo(ctypes.sizeof(_FlashInfo), hwnd, _FLASHW_ALL | _FLASHW_TIMERNOFG, 0, 0)
+    user32.FlashWindowEx(ctypes.byref(info))
 
 
 def _win32():
@@ -121,6 +159,18 @@ def _win32():
     user32.SetForegroundWindow.restype = wintypes.BOOL
     user32.BringWindowToTop.argtypes = [wintypes.HWND]
     user32.BringWindowToTop.restype = wintypes.BOOL
+    user32.SetWindowPos.argtypes = [
+        wintypes.HWND,
+        wintypes.HWND,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.UINT,
+    ]
+    user32.SetWindowPos.restype = wintypes.BOOL
+    user32.FlashWindowEx.argtypes = [ctypes.c_void_p]
+    user32.FlashWindowEx.restype = wintypes.BOOL
     user32.SetFocus.argtypes = [wintypes.HWND]
     user32.SetFocus.restype = wintypes.HWND
     user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
