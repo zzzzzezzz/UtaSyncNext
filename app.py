@@ -8,6 +8,7 @@ from pathlib import Path
 
 from engine.cache_env import app_root, apply_next_cache_env
 from core.instance_lock import SingleInstanceLock
+from core.window_focus import focus_window_by_title
 
 
 APP_LAUNCH_STARTED_AT = time.perf_counter()
@@ -50,19 +51,29 @@ def main() -> None:
 
 
 def _show_already_running_message() -> None:
+    """Handle a second launch: wake the running window, or explain the dead end.
+
+    A launcher that is stuck without a window (a killed GUI thread, a crashed
+    mainloop) still holds the instance lock, and from here that looks exactly
+    like a healthy instance. When no window can be found the message names the
+    recovery instead of leaving the user with an app that will not open.
+    """
+    if focus_window_by_title():
+        return
+    text = (
+        "UtaSyncNext 已经在运行，但没有找到它的窗口。\n\n"
+        "请在任务管理器里结束 UtaSyncNext.exe 后重新启动。"
+        "刚关掉界面时进程还会占用单实例锁，等几秒再试一次即可。"
+    )
     try:
         from tkinter import Tk, messagebox
 
         root = Tk()
         root.withdraw()
-        messagebox.showinfo(
-            "UtaSyncNext 已在运行",
-            "UtaSyncNext 已经打开。\n请使用当前窗口，避免重复占用模型和显存。",
-            parent=root,
-        )
+        messagebox.showinfo("UtaSyncNext 已在运行", text, parent=root)
         root.destroy()
     except Exception:
-        print("UtaSyncNext 已经打开，请使用当前窗口。")
+        print(text)
 
 
 def _write_crash_log(exc: BaseException) -> None:

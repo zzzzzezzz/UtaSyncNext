@@ -89,6 +89,7 @@ def main() -> int:
     _add(results, "pipeline-preview", _check_pipeline_preview)
     _run_script(results, "model-offline", ["tools/verify_model_download.py"])
     _run_script(results, "instance-lock", ["tools/smoke_instance_lock.py"])
+    _run_script(results, "instance-activation", ["tools/smoke_instance_activation.py"])
     _run_script(results, "translation-guardrails", ["tools/smoke_translation_guardrails.py"])
     _run_script(results, "subtitle-density", ["tools/smoke_subtitle_density.py"])
     _run_script(results, "asr-diagnostics", ["tools/smoke_asr_diagnostics.py"])
