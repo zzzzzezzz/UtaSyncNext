@@ -68,7 +68,7 @@ EMPTY -> READY -> PREFLIGHT -> RUNNING -> SUCCEEDED
 RUNNING -> CANCELLING -> CANCELLED
 ```
 
-`QUEUED` 已在状态枚举中保留给串行批量队列。当前 controller 是单任务，不会并行抢显存。所有布局都应通过 `TaskSnapshot` 渲染，而不是在 worker 中写控件。
+`QUEUED` 只是状态枚举里的保留值。当前 controller 是单任务，不会并行抢显存；批量队列已决策不做，原因见 [`DECISIONS.md`](DECISIONS.md)。所有布局都应通过 `TaskSnapshot` 渲染，而不是在 worker 中写控件。
 
 ## 安全和资源边界
 

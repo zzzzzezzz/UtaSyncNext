@@ -10,8 +10,8 @@
 - [x] 工作区顶部任务状态卡
 - [x] 单任务生命周期接入现有 controller 回调
 - [x] Next 主页面布局与高级设置入口（`ExperimentalSidebarPanel` / `AdvancedSettingsDialog`）
-- [ ] 串行批量任务队列
 - [ ] 任务卡片、重试和恢复入口
+- 批量任务队列已决策不做，原因见 [`docs/DECISIONS.md`](docs/DECISIONS.md)。
 
 ## 页面结构
 
@@ -36,14 +36,14 @@
 
 - `RUNNING → CANCELLING → CANCELLED`
 - `PREFLIGHT/RUNNING → FAILED`
-- `READY → QUEUED → PREFLIGHT`（批量队列阶段启用）
+- `READY → QUEUED → PREFLIGHT`（`QUEUED` 只是保留状态，当前不使用）
 
 所有状态都通过不可变 `TaskSnapshot` 渲染；worker 仍只发送现有进度、状态、日志和结果消息。
 
 ## 不变量
 
 1. UI 主线程只负责渲染和调度，不导入重型 ASR/分离模型。
-2. 一个任务只能有一个 worker；批量队列先串行，不并发抢显存。
+2. 一个任务只能有一个 worker；当前 controller 只跑单任务，不并发抢显存。
 3. 取消、失败和完成都必须留下可读状态与日志路径。
 4. 旧设置键和输出路径在迁移期间保持兼容。
 5. 每个 UI 改动都要有纯状态 smoke 或现有 UI acceptance 证据。
@@ -51,6 +51,5 @@
 ## 后续切片
 
 1. 继续收敛高级设置弹窗的入口和状态反馈。
-2. 把 `TaskController` 的单任务生命周期包装成串行队列。
-3. 增加任务卡片的重试、恢复和输出快捷操作。
-4. 完成源 UI 与打包 exe 的交互验收后，再冻结发布包。
+2. 增加任务卡片的重试、恢复和输出快捷操作。
+3. 完成源 UI 与打包 exe 的交互验收后，再冻结发布包。
