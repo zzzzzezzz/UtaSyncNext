@@ -405,6 +405,8 @@ def _format_known_line(text: str) -> str | None:
         return "压制：硬字幕视频已生成：" + _suffix_after_bracket(text)
     if "[压制失败]" in text:
         return "压制：失败：" + _suffix_after_bracket(text)
+    if "[压制回退]" in text:
+        return "压制：" + _suffix_after_bracket(text)
 
     return None
 

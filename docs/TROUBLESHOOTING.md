@@ -164,7 +164,7 @@ output/<任务名>/logs/utasyncnext_recovery_YYYYMMDD_HHMMSS.json
 * 只有音频缓存：可减少提取/分离，但仍需重新听写。
 * 有翻译批次缓存但没有可复用 ASR：需先生成并校验源 SRT，不能保证直接续接。
 
-性能报告位于 `output/<任务名>/logs/utasyncnext_performance_*.txt` 和 `.json`。硬字幕压制失败时，UI 会写 `utasyncnext_burn_error_*.txt`；FFmpeg 会先尝试 NVIDIA `h264_nvenc`，再回退 CPU `libx264`。
+性能报告位于 `output/<任务名>/logs/utasyncnext_performance_*.txt` 和 `.json`。硬字幕压制失败时，UI 会写 `utasyncnext_burn_error_*.txt`；FFmpeg 会依次尝试 `h264_nvenc`、`h264_qsv`、`h264_amf`，都不可用时落到 CPU `libx264`，日志会写明每个候选失败的原因。
 
 ## 打包和安全检查
 

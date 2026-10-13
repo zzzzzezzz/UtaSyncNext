@@ -61,7 +61,7 @@ powershell -ExecutionPolicy Bypass -File tools\bootstrap_venv.ps1 -Engine
 - 可选 OpenAI 兼容接口翻译，支持中日双语或纯中文字幕。
 - SRT、ASS 花字、缓存复用、错误日志和恢复报告。
 - ASS 预览、字体导入/搭配、预设编辑、字幕浏览器校对。
-- FFmpeg 硬字幕压制：优先 `h264_nvenc`，失败后回退 `libx264`。
+- FFmpeg 硬字幕压制：按 `h264_nvenc`、`h264_qsv`、`h264_amf`、`libx264` 的顺序逐个尝试，前三个用不了就落到 CPU 软压。
 - 轻量 Launcher 与 `.engine`、`models_faster` 分离，模型不随 Launcher 打包。
 
 默认任务会跳过 Demucs，以尽快得到打轴结果；在设置中选择高质量人声分离后才会检查 Demucs 权重。任务只使用本地已完整下载的 Faster-Whisper 模型，不会在管线中偷偷联网下载。

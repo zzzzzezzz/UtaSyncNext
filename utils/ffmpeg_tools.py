@@ -234,8 +234,13 @@ class FFmpegAudioProcessor:
 class FFmpegSubtitleBurner:
     """Burn ASS subtitles into a video using a low-priority FFmpeg process."""
 
+    # 候选取自 V3 的做法，按顺序尝试，失败就换下一个；最后一项是 CPU 软压，几乎任何环境都可用。
+    # VideoToolbox 是 macOS 专用，本应用只发布 Windows，因此不列入。
+    # QSV 的编码器只接受 nv12/qsv 像素格式，必须显式给 -pix_fmt nv12。
     ENCODERS = [
         ("NVIDIA 显卡", "h264_nvenc", ["-preset", "fast", "-pix_fmt", "yuv420p", "-cq", "22"]),
+        ("Intel 核显", "h264_qsv", ["-preset", "fast", "-global_quality", "22", "-pix_fmt", "nv12"]),
+        ("AMD 显卡", "h264_amf", ["-quality", "speed", "-rc", "cqp", "-qp_i", "22", "-qp_p", "22", "-qp_b", "22", "-pix_fmt", "yuv420p"]),
         ("CPU 兼容模式", "libx264", ["-preset", "superfast", "-crf", "22", "-threads", "4"]),
     ]
 
@@ -275,7 +280,7 @@ class FFmpegSubtitleBurner:
         expect_audio = _media_has_stream(media, "audio")
         start_time = time.monotonic()
         try:
-            for encoder_name, codec, encoder_args in FFmpegSubtitleBurner.ENCODERS:
+            for index, (encoder_name, codec, encoder_args) in enumerate(FFmpegSubtitleBurner.ENCODERS):
                 if cancel_event and cancel_event.is_set():
                     raise RuntimeError("用户取消了视频压制。")
 
@@ -377,12 +382,12 @@ class FFmpegSubtitleBurner:
                     last_error = _summarize_ffmpeg_failure(output_tail, return_code)
                 work_output.unlink(missing_ok=True)
                 if log_cb:
-                    if codec == "h264_nvenc":
-                        log_cb(f"[压制回退] 显卡编码未成功，正在改用 CPU。原因：{last_error}\n")
+                    if index == len(FFmpegSubtitleBurner.ENCODERS) - 1:
+                        log_cb(f"[压制失败] {encoder_name}也未成功。原因：{last_error}\n")
                     else:
-                        log_cb(f"[压制失败] CPU 编码也未成功。原因：{last_error}\n")
+                        log_cb(f"[压制回退] {encoder_name}未成功，正在尝试下一个编码器。原因：{last_error}\n")
 
-            raise RuntimeError("视频压制失败，显卡和 CPU 编码均未成功。请导出错误日志后检查 FFmpeg 环境。")
+            raise RuntimeError("视频压制失败，所有候选编码器都未成功。请导出错误日志后检查 FFmpeg 环境。")
         finally:
             try:
                 work_output.unlink(missing_ok=True)

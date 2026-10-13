@@ -17,7 +17,7 @@ V3 把一整条流水线塞进 1177 行的 `app.py` 加 `core/` 三个模块，�
 | 依赖分层 | 一个环境装全部 | 轻量 `.venv` 负责 UI，外置 `.engine` 承载 Torch/Demucs/Faster-Whisper |
 | 模型管理 | 目录自带，人工准备 | `engine/model_registry.py` 校验完整快照，缺失就在预检阶段停下并给安装指引 |
 | 缓存 | 单一哈希指纹，粒度粗 | ASR 指纹 v7、翻译指纹 v8，分阶段、批次级、失败可续跑 |
-| 硬件编码 | NVENC → VideoToolbox → QSV → AMF → CPU，共 5 个候选 | NVENC → CPU，共 2 个候选 |
+| 硬件编码 | NVENC → VideoToolbox → QSV → AMF → CPU，共 5 个候选 | NVENC → QSV → AMF → CPU，共 4 个候选（不列 macOS 专用的 VideoToolbox） |
 | 单实例 | 无 | 命名互斥体；第二次启动把已有窗口带到前台，并写启动日志 |
 | 自动化测试 | 无 | `tools/verify_next_stack.py` 七档 profile，另有 71 个 tools 脚本 |
 | CI | 无 | `.github/workflows/verify.yml`，windows-latest 跑同一套检查 |
@@ -36,6 +36,12 @@ V3 把一整条流水线塞进 1177 行的 `app.py` 加 `core/` 三个模块，�
 - **参考歌词对齐**、双语和纯中文输出、ASS 花字预设、FFmpeg 低优先级压制。
 - **缓存命中跳过昂贵阶段**：改歌词不会强制重跑 ASR。
 
+## 硬件编码回退
+
+压制按 NVENC → Intel QSV → AMD AMF → CPU 软压 的顺序逐个尝试，和 V3 一致，只少了 macOS 专用的 VideoToolbox。用不上的候选会立刻失败并换下一个。
+
+开发机（GTX 1660 SUPER、8 逻辑核）上 60 秒 1080p 素材带 ASS 花字：NVENC 7.7 秒，CPU `libx264`（`superfast` / `crf 22` / `threads 4`）18.2 秒，相差约 2.4 倍；NVENC 输出 42.9 MB，libx264 输出 29.1 MB，硬件编码更快但文件更大。三个不可用候选（`h264_videotoolbox` 未编译、`h264_amf` 无 AMD 卡、`h264_qsv` 无可用 MFX 会话）实测全部在 1 到 2 秒内失败，合计 3.1 秒，所以缺硬件的机器在回退链上只多花一两秒。
+
 ## Next 新补的工程能力
 
 - **进程隔离**：Faster-Whisper、CTranslate2、Torch 和 Demucs 的 native/CUDA 状态都留在 worker 子进程里，取消时直接杀进程，UI 不会被拖死。V3 用线程，取消后容易残留显存。
@@ -48,20 +54,10 @@ V3 把一整条流水线塞进 1177 行的 `app.py` 加 `core/` 三个模块，�
 
 ## Next 不如 V3 的地方
 
-1. **硬件编码候选从 5 个减到 2 个**。V3 依次尝试 NVENC、VideoToolbox、QSV、AMF、libx264；Next 只有 NVENC 和 libx264。影响范围只有最后一步硬字幕压制，ASR、Demucs、翻译和 ASS 生成都不看这张表。
+1. **多了一层安装概念**。V3 是"装完依赖直接 `python app.py`"；Next 第一次要先跑 `tools\bootstrap_venv.ps1`，需要跑真任务时再加 `-Engine`。换来的是 Launcher 启动快、模型不重复打包、依赖可以独立升级。
 
-   实际影响是速度而不是可用性：NVENC 不可用时退到 libx264 软压，仍然出片。在开发机（GTX 1660 SUPER、8 逻辑核）上实测 60 秒 1080p 素材带 ASS 花字：NVENC 7.7 秒，libx264（`superfast` / `crf 22` / `threads 4`）18.2 秒，相差约 2.4 倍；换算 15 分钟片子是 1.9 分钟对 4.6 分钟。一个反直觉的点是 NVENC 那条（`-cq 22`）输出 42.9 MB，libx264（`-crf 22`）只有 29.1 MB，硬件编码更快但文件更大。
-
-   换到 AMD 或 Intel 显卡时会退到 CPU 软压，慢 2.4 倍但照常出片；只有 ffmpeg 本身缺失或损坏才会完全压不出来。这台开发机的 ffmpeg 其实已经编进了 `h264_amf` 和 `h264_qsv`，只是代码没有去试。
-
-   恢复成本很低：`utils/ffmpeg_tools.py` 的 `ENCODERS` 列表加两行，再把 `burn()` 里写死"显卡回退 / CPU 也失败"的日志改成按候选名输出。实测三个不可用编码器（`h264_videotoolbox` 未编译、`h264_amf` 无 AMD 卡、`h264_qsv` 无可用 MFX 会话）全部在 1 到 2 秒内失败，三个合计 3.1 秒，所以加回候选项在不可用硬件上只多花一两秒，不会挂起。要不要补由你决定。
-
-   真正吃显卡的是 ASR 和 Demucs：它们依赖 CUDA，换成 AMD 卡会退到 CPU `int8`，那个慢得多。这一点 V3 和 Next 相同（V3 也是 `device="cuda"` 失败后退 CPU），不是 Next 的退步。
-
-2. **多了一层安装概念**。V3 是"装完依赖直接 `python app.py`"；Next 第一次要先跑 `tools\bootstrap_venv.ps1`，需要跑真任务时再加 `-Engine`。换来的是 Launcher 启动快、模型不重复打包、依赖可以独立升级。
-
-3. **研究脚本和生产工具混在一个目录**。`tools/` 里 71 个脚本有一部分是一次性研究或验收工具（`research_*`、`smoke_font_pair_ui_robot` 之类），不像 V3 那样干净。它们对复现证据有价值，但不是生产契约，`docs/STATUS.md` 已经标注了这一点。
+2. **研究脚本和生产工具混在一个目录**。`tools/` 里 71 个脚本有一部分是一次性研究或验收工具（`research_*`、`smoke_font_pair_ui_robot` 之类），不像 V3 那样干净。它们对复现证据有价值，但不是生产契约，`docs/STATUS.md` 已经标注了这一点。
 
 ## 结论
 
-对当前的使用方式（Windows + NVIDIA、逐片调花字、需要可复现的回归证据）来说，Next 是 V3 的超集：能力没少，工程性和可维护性明显更强。唯一需要你拍板的能力缺口是 QSV 和 AMF 这两个硬件编码候选。
+对当前的使用方式（Windows + NVIDIA、逐片调花字、需要可复现的回归证据）来说，Next 是 V3 的超集：功能没有减少，工程性、可维护性和可验证性都明显更强；相对 V3 剩下的差异只有安装多一层 `.engine` 概念，以及 `tools/` 里混着研究脚本。

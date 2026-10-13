@@ -10,13 +10,13 @@
 - ASR v7 / 翻译 v8 缓存、批次翻译续跑、ASS 预览、字体导入和预设删除/改名/恢复。
 - Launcher boundary、打包审计、回归工作区和大量本地 smoke。
 - 第二次启动（源码运行或打包后的 exe）会把已运行的窗口带到前台，只有确实找不到窗口时才提示恢复方式。
+- 硬字幕压制按 NVENC → Intel QSV → AMD AMF → CPU 软压 逐级回退，日志会写明每一步的失败原因。
 - 文档体系：README 加 `docs/` 15 篇，以及 GitHub Actions 上的 `verify` 工作流。
 
 ## 仍在演进
 
 - 批量任务队列已决策不做（每个视频的花字和预设都要逐片调整，队列会牺牲这种逐片控制）；任务卡片、重试/恢复入口仍在 UI 重构计划中。
 - 部分大型研究脚本和 `test_workspace` 证据属于研究/验收资产，不应直接当成生产算法契约。
-- 硬件压制目前只有 NVENC 和 libx264 两个候选，V3 时代的 QSV/AMF 没有恢复，详见 [`V3_COMPARISON.md`](V3_COMPARISON.md)。
 - 真正 API 翻译、large-v2/large-v3 下载、长视频和 Demucs 耐久测试不属于默认验证。
 
 ## 发布（杀青）前还剩的事
