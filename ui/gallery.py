@@ -8,6 +8,7 @@ import customtkinter as ctk
 from PIL import Image, ImageOps
 
 from core.ass_maker import ASS_PRESETS, BUILTIN_PRESETS
+from core.subtitle_policy import apply_layout_policy, resolve_subtitle_layout
 from ui.ass_preview_frame import render_ass_preview_frame
 from ui.design_tokens import UTASYNC_TOKENS
 from ui.font_catalog import discover_user_fonts, load_user_font_pairs, save_user_font_pairs
@@ -23,6 +24,11 @@ from ui.window_icon import apply_child_window_icon
 # height, used to size the panel from its content instead of a fixed guess.
 EDITOR_COLLAPSED_HEIGHT = 48
 EDITOR_HEADER_HEIGHT = 44
+
+# The preview card letterboxes the real frame, so a very tall portrait frame is
+# capped instead of pushing everything else off screen.
+PREVIEW_STAGE_MIN_HEIGHT = 150
+PREVIEW_STAGE_MAX_HEIGHT = 460
 
 FONT_PAIR_OPTIONS: dict[str, tuple[str, str]] = {
     "雅黑 + Meiryo（默认）": ("Microsoft YaHei", "Meiryo"),
@@ -101,6 +107,9 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         self.card_widgets: list[ctk.CTkFrame] = []
         self._preview_generation = 0
         self._preview_image: ctk.CTkImage | None = None
+        self._preview_source: Image.Image | None = None
+        self._preview_aspect = 16 / 9
+        self._preview_stage_width = 0
         self._preset_removed: list[str] = []
         self._preset_renamed: dict[str, str] = {}
         self._font_preview_window: ctk.CTkToplevel | None = None
@@ -473,6 +482,9 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         self.preview_jp.pack(pady=(8, 0))
         self.preview_frame_label = ctk.CTkLabel(self.preview_stage, text="")
         self.preview_frame_label.pack_forget()
+        self.preview_stage.bind("<Configure>", self._on_preview_stage_resize)
+        self._preview_aspect = self._settings_aspect()
+        self._sync_preview_stage_height()
 
         meta = ctk.CTkFrame(self.preview_panel, fg_color="transparent")
         meta.pack(fill="x", padx=18, pady=(0, 10))
@@ -814,9 +826,31 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         )
 
     def _show_text_preview(self) -> None:
+        self._preview_source = None
         self.preview_frame_label.pack_forget()
         self.preview_ch.pack(pady=(18, 0))
         self.preview_jp.pack(pady=(8, 0))
+
+    def _settings_aspect(self) -> float:
+        """Frame aspect the export will use, so the card shows the same shape."""
+
+        try:
+            settings = dict(self.get_settings_cb() or {})
+        except Exception:
+            settings = {}
+        policy = resolve_subtitle_layout(None, settings)
+        if policy.resolution_x and policy.resolution_y:
+            return policy.resolution_x / policy.resolution_y
+        return 16 / 9
+
+    def _preview_layout_config(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Apply the same safe-area policy the export applies."""
+
+        try:
+            settings = dict(self.get_settings_cb() or {})
+        except Exception:
+            settings = {}
+        return apply_layout_policy(config, resolve_subtitle_layout(None, settings), settings)
 
     def _request_ass_preview(self, config: dict[str, Any]) -> None:
         if not hasattr(self, "preview_frame_label"):
@@ -826,34 +860,82 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         japanese = TIMELINE_LINES[getattr(self, "active_timeline_index", 0)][2]
         chinese = TIMELINE_LINES[getattr(self, "active_timeline_index", 0)][1]
         self.preview_badge.configure(text="ASS 渲染中…")
+        render_config = self._preview_layout_config(config)
+        result: dict[str, Any] = {}
 
         def worker() -> None:
             try:
-                image = render_ass_preview_frame(config, japanese, chinese)
+                result["image"] = render_ass_preview_frame(render_config, japanese, chinese)
             except Exception as exc:
-                self.after(0, lambda: self._ass_preview_failed(generation, exc))
-                return
-            self.after(0, lambda: self._display_ass_preview(generation, image))
+                result["error"] = exc
 
+        # The worker never touches Tk; the UI thread collects the frame. This
+        # keeps the card working when no event loop is running (smoke tests).
         threading.Thread(target=worker, daemon=True).start()
+        self.after(60, lambda: self._poll_ass_preview(generation, result))
+
+    def _poll_ass_preview(self, generation: int, result: dict[str, Any]) -> None:
+        if generation != self._preview_generation or not self.winfo_exists():
+            return
+        error = result.get("error")
+        if error is not None:
+            self._ass_preview_failed(generation, error)
+            return
+        image = result.get("image")
+        if image is None:
+            self.after(60, lambda: self._poll_ass_preview(generation, result))
+            return
+        self._display_ass_preview(generation, image)
 
     def _display_ass_preview(self, generation: int, image: Image.Image) -> None:
         if generation != self._preview_generation or not self.winfo_exists():
             return
+        self._preview_source = image
+        if image.height:
+            self._preview_aspect = image.width / image.height
+        self._sync_preview_stage_height()
+        self._refit_preview_frame()
+        self.preview_badge.configure(text="真实 ASS 预览")
+
+    def _refit_preview_frame(self) -> None:
+        """Letterbox the frame into the card instead of cropping it.
+
+        The old centre crop kept only a thin band of the frame, which pushed the
+        subtitle line out of the card: the render had succeeded but the card
+        looked empty.
+        """
+
+        source = self._preview_source
+        if source is None or not hasattr(self, "preview_frame_label"):
+            return
         width = max(220, self.preview_stage.winfo_width() - 16)
         height = max(90, self.preview_stage.winfo_height() - 10)
-        frame = ImageOps.fit(
-            image.copy(),
-            (width, height),
-            method=Image.Resampling.LANCZOS,
-            centering=(0.5, 0.84),
-        )
+        frame = ImageOps.contain(source, (width, height), method=Image.Resampling.LANCZOS)
         self._preview_image = ctk.CTkImage(light_image=frame, dark_image=frame, size=frame.size)
         self.preview_ch.pack_forget()
         self.preview_jp.pack_forget()
         self.preview_frame_label.configure(image=self._preview_image, text="")
         self.preview_frame_label.pack(fill="both", expand=True)
-        self.preview_badge.configure(text="真实 ASS 预览")
+
+    def _sync_preview_stage_height(self, width: int | None = None) -> None:
+        """Keep the card at the export aspect so the frame is not squashed."""
+
+        ratio = self._preview_aspect if self._preview_aspect > 0 else 16 / 9
+        current_width = int(width or self.preview_stage.winfo_width())
+        if current_width <= 1:
+            return
+        target = int(
+            max(PREVIEW_STAGE_MIN_HEIGHT, min(current_width / ratio, PREVIEW_STAGE_MAX_HEIGHT))
+        )
+        if abs(target - int(self.preview_stage.cget("height"))) > 2:
+            self.preview_stage.configure(height=target)
+
+    def _on_preview_stage_resize(self, event: Any) -> None:
+        if event.width == self._preview_stage_width:
+            return
+        self._preview_stage_width = event.width
+        self._sync_preview_stage_height(event.width)
+        self._refit_preview_frame()
 
     def _ass_preview_failed(self, generation: int, exc: Exception) -> None:
         if generation != self._preview_generation or not self.winfo_exists():

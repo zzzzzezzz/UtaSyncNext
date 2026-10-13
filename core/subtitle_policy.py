@@ -65,7 +65,15 @@ class SubtitleDensityMetrics:
     duration_seconds: float
 
 
-def resolve_subtitle_layout(media_path: str, settings: Mapping[str, Any]) -> SubtitleLayoutPolicy:
+def resolve_subtitle_layout(media_path: str | None, settings: Mapping[str, Any]) -> SubtitleLayoutPolicy:
+    """Resolve the safe area for ``media_path``, or for the manual aspect alone.
+
+    ``media_path`` may be ``None`` (for example when the user previews a style
+    before importing a video). The explicit aspect choices still apply then; the
+    auto-detect branch falls back to the 16:9 default because there is no source
+    frame to measure.
+    """
+
     width, height = _probe_video_size(media_path)
     aspect_setting = str(settings.get("aspect_ratio") or "")
     ratio = width / height if width and height else 16 / 9
@@ -439,7 +447,9 @@ def _portrait_policy(width: int, height: int, note: str) -> SubtitleLayoutPolicy
     )
 
 
-def _probe_video_size(media_path: str) -> tuple[int, int]:
+def _probe_video_size(media_path: str | None) -> tuple[int, int]:
+    if not media_path:
+        return 0, 0
     path = Path(media_path)
     if not path.exists():
         return 0, 0

@@ -23,6 +23,18 @@ RENDER_WIDTH = 1920
 RENDER_HEIGHT = 1080
 
 
+def _card_size_for(res_x: int, res_y: int) -> tuple[int, int]:
+    """Downscale an export frame for the preview card without distorting it.
+
+    A fixed 640x360 target squashed portrait and square canvases back into 16:9,
+    which is why 9:16 and 16:9 looked identical in the style workbench.
+    """
+
+    if res_x <= 0 or res_y <= 0:
+        return PREVIEW_WIDTH, PREVIEW_HEIGHT
+    return PREVIEW_WIDTH, max(1, int(round(PREVIEW_WIDTH * res_y / res_x)))
+
+
 def render_ass_preview_frame(
     config: dict[str, Any],
     japanese: str,
@@ -38,12 +50,12 @@ def render_ass_preview_frame(
     ``output_size`` only changes the pixel size of the returned frame. The ASS
     canvas always stays at the resolved export resolution because font sizes are
     relative to PlayResY; a preview window asks for the export size so the frame
-    can be zoomed to 1:1, while the small workbench card keeps the cheap default.
+    can be zoomed to 1:1, while the small workbench card keeps the cheap default
+    (still matched to the canvas aspect).
     """
     ffmpeg = inspect_ffmpeg().get("ffmpeg")
     if not ffmpeg:
         raise FileNotFoundError("未检测到 FFmpeg，无法显示真实 ASS 预览")
-    frame_width, frame_height = output_size or (PREVIEW_WIDTH, PREVIEW_HEIGHT)
 
     with tempfile.TemporaryDirectory(prefix="utasync-ass-preview-") as tmp:
         temp_root = Path(tmp)
@@ -64,6 +76,9 @@ def render_ass_preview_frame(
         # is fine. The finished frame is downscaled for the preview card instead.
         preview_config["resolution_x"] = int(preview_config.get("resolution_x") or RENDER_WIDTH)
         preview_config["resolution_y"] = int(preview_config.get("resolution_y") or RENDER_HEIGHT)
+        frame_width, frame_height = output_size or _card_size_for(
+            preview_config["resolution_x"], preview_config["resolution_y"]
+        )
         ass_path = Path(ASSMaker(str(source)).generate_ass(preview_config))
         fonts_dir = app_root() / "fonts"
         fonts_filter = f":fontsdir={_escape_filter_path(fonts_dir)}" if fonts_dir.is_dir() else ""

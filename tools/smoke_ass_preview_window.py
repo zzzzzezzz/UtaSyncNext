@@ -50,6 +50,71 @@ def _wait_for_render(root: object, window: object, timeout: float = 45.0) -> Non
     raise TimeoutError("预览渲染超时")
 
 
+class _FakeSidebar:
+    """Stands in for the settings sidebar so the real action runner can run."""
+
+    def __init__(self, settings: dict[str, object], dialog: object) -> None:
+        self._settings = settings
+        self._advanced_dialog = dialog
+
+    def get_current_settings(self) -> dict[str, object]:
+        return dict(self._settings)
+
+
+class _FakeHost:
+    def __init__(self, settings: dict[str, object], dialog: object) -> None:
+        self.sidebar = _FakeSidebar(settings, dialog)
+        self.video_path = ""
+        self.media_path = ""
+
+
+def _run_entry_point(root: object) -> dict[str, object]:
+    """The 目标画幅比 dropdown must reach the window even without a media file.
+
+    Regression: the runner only applied the safe-area policy when a video was
+    already imported, so 16:9 and 9:16 produced the same 1920x1080 preview.
+    """
+
+    import customtkinter as ctk
+
+    from ui.ass_actions import AssActionRunner
+    from ui.ass_preview_window import AssPreviewWindow
+
+    dialog = ctk.CTkToplevel(root)  # type: ignore[arg-type]
+    dialog.withdraw()
+    try:
+        results: dict[str, object] = {}
+        for label, aspect, expected in (
+            ("wide", "16:9 (常规宽屏/默认)", (1920, 1080)),
+            ("portrait", "9:16 (竖屏短视频)", (1080, 1920)),
+        ):
+            AssPreviewWindow._instance = None
+            settings = {
+                "ass_preset": "默认双语 (纯白+浅灰)",
+                "aspect_ratio": aspect,
+                "fade_mode": "硬切",
+            }
+            runner = AssActionRunner(_FakeHost(settings, dialog))
+            runner.preview_ass_style()
+            window = AssPreviewWindow._instance
+            _require(window is not None, f"{label}: 预览窗口没有打开")
+            _wait_for_render(root, window)
+            size = window._source.size
+            _require(size == expected, f"{label}: 画幅比没有生效，得到 {size}")
+            geometry = str(window.geometry())
+            width, height = (int(part) for part in geometry.split("+")[0].split("x"))
+            _require(
+                (height > width) == (expected[1] > expected[0]),
+                f"{label}: 窗口形状和画幅不一致：{geometry}",
+            )
+            results[label] = f"{size[0]}x{size[1]}"
+            window.close()
+            root.update()  # type: ignore[attr-defined]
+        return results
+    finally:
+        dialog.destroy()
+
+
 def _run() -> dict[str, object]:
     import customtkinter as ctk
 
@@ -104,11 +169,13 @@ def _run() -> dict[str, object]:
         window.close()
         root.update()
         _require(AssPreviewWindow._instance is None, "关闭后实例没有释放")
+        entry_points = _run_entry_point(root)
         return {
             "status": "passed",
             "landscape": "1920x1080",
             "portrait": "1080x1920",
             "zoom_modes": ["fit", "1:1", "wheel"],
+            "aspect_from_settings": entry_points,
         }
     finally:
         if window is not None and window.winfo_exists():

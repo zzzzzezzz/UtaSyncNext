@@ -28,12 +28,16 @@ class AssActionRunner:
             return
 
         config = build_ass_config(ASS_PRESETS, settings, preset_name=str(ass_choice))
-        source_note = ""
         media_path = str(getattr(self.host, "video_path", "") or getattr(self.host, "media_path", "") or "")
-        if media_path and os.path.exists(media_path):
-            preview_policy = resolve_subtitle_layout(media_path, settings)
-            config = apply_layout_policy(config, preview_policy, settings)
+        # 预览必须带上安全区策略，否则画幅比设置根本不生效：没有媒体时也要按
+        # 手动选择的画幅比（16:9 / 9:16 / 1:1 / 4:3）出帧。
+        has_media = bool(media_path) and os.path.exists(media_path)
+        preview_policy = resolve_subtitle_layout(media_path if has_media else None, settings)
+        config = apply_layout_policy(config, preview_policy, settings)
+        if has_media:
             source_note = policy_log_line(preview_policy).rstrip("。")
+        else:
+            source_note = f"未导入媒体 · {preview_policy.note}"
         # 高级设置是模态弹窗：预览窗口必须挂在它下面，模态抓取才不会冻住新窗口。
         dialog = getattr(self.host.sidebar, "_advanced_dialog", None)
         if dialog is not None and not dialog.winfo_exists():
