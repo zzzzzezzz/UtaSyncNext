@@ -1,6 +1,8 @@
 # UtaSyncNext 系统验证计划
 
-目标：用分层测试确认 Next 可以独立运行、独立下载模型、独立调度 worker，并且不会误依赖 V3。
+目标：用分层测试确认 UtaSyncNext 可以独立运行、独立管理模型、独立调度 worker，并且不会误依赖 V3。当前入口见 [`README.md`](README.md)，测试命令索引见 [`docs/TESTING.md`](docs/TESTING.md)。
+
+复核日期：2026-10-13。
 
 ## 测试机器人
 
@@ -13,7 +15,7 @@
 统一入口：
 
 ```powershell
-cd /d E:\traecode\UtaSync\UtaSyncNext
+Set-Location E:\traecode\UtaSync\UtaSyncNext
 .venv\Scripts\python.exe tools\verify_next_stack.py --profile quick
 ```
 
@@ -192,10 +194,12 @@ available.
 ## Fast Health Check
 
 Use this after small UI/engine changes. It does not download models, import Torch, load Whisper,
-run translation smoke tests, import Tk/UI modules, or execute the pipeline.
+run real translation API smoke tests, or execute the real ASR pipeline. It does run many local
+smoke checks, including Tk/font/style previews, FFmpeg preflight, cache policy and regression
+workspace checks. It is not a pure package-only health check.
 
 ```powershell
-cd /d E:\traecode\UtaSync\UtaSyncNext
+Set-Location E:\traecode\UtaSync\UtaSyncNext
 .venv\Scripts\python.exe tools\verify_next_stack.py --profile health --json-report test_logs\health.json
 ```
 
@@ -209,7 +213,7 @@ Expected coverage:
 - Audio cache policy regression.
 - Offline model registry scan.
 
-Run `--profile quick` when you also want translator smoke tests and UI import checks.
+Run `--profile quick` when you also want fake-API translator smoke tests and UI import checks.
 
 ## Lightweight Launcher Packaging
 
@@ -217,7 +221,7 @@ The launcher package must stay thin. Build dependencies are separate from runtim
 dependencies:
 
 ```powershell
-cd /d E:\traecode\UtaSync\UtaSyncNext
+Set-Location E:\traecode\UtaSync\UtaSyncNext
 .venv\Scripts\python.exe -m pip install -r requirements-build.txt
 ```
 
@@ -254,10 +258,10 @@ Demucs weights are stored under the Next-local cache:
 UtaSyncNext\.cache\torch\hub\checkpoints
 ```
 
-The current engine uses `torchaudio==2.11.0`, whose WAV save path can require
-`torchcodec`. UtaSyncNext routes Demucs through `engine\demucs_runner.py` so
-Demucs can save `vocals.wav` with the Python standard `wave` module instead of
-requiring another heavy package.
+The locked engine dependencies are `torch==2.5.1+cu121` and
+`torchaudio==2.5.1+cu121` (see `requirements-engine.txt`). UtaSyncNext routes
+Demucs through `engine\demucs_runner.py` so its WAV output uses the Python
+standard `wave` module and does not add a `torchcodec` requirement to the launcher.
 
 Verified commands:
 
@@ -282,21 +286,32 @@ Next favors fast first results by default:
 - Demucs remains available as `开启 Demucs 人声分离 (高质量/很慢)`.
 - Speech mode always skips Demucs.
 
-Pipeline caches must be fast but not stale. The ASR cache fingerprint includes:
+Pipeline caches must be fast but not stale. The ASR cache fingerprint is version 7 and includes:
 
 - media path, size, modified time, and edge content hash
 - normalized audio mode
 - selected Whisper model and snapshot path
 - Demucs skip/enabled state
 - hardware/Demucs scheduling mode
+- subtitle layout policy
 
-The translation cache fingerprint includes:
+Reference lyrics are intentionally excluded from the ASR fingerprint, so lyric
+corrections do not force an expensive Whisper/Demucs rerun. The old v6 marker
+can be upgraded after a validated reuse.
+
+The translation completion fingerprint is version 8 and includes:
 
 - media fingerprint
 - source SRT content hash
 - reference lyrics
 - output mode
 - API URL and model id
+- subtitle layout policy
+
+Successful translation batches remain reusable after a partial failure; the
+completion marker is written only when every batch succeeds. See
+[`docs/PIPELINE.md`](docs/PIPELINE.md) for artifact names and review-only
+lyric-gap preview rules.
 
 Run this after cache/scheduling changes:
 

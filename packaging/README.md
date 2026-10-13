@@ -1,5 +1,8 @@
 # UtaSyncNext Launcher Packaging
 
+当前开发入口见 [`../README.md`](../README.md)，完整打包检查清单见
+[`../docs/PACKAGING.md`](../docs/PACKAGING.md)。
+
 UtaSyncNext is split into a light launcher and an external engine.
 
 ## Target Layout
@@ -38,7 +41,7 @@ UtaSyncNext/
 Build dependencies are separate from normal UI runtime dependencies:
 
 ```powershell
-cd /d E:\traecode\UtaSync\UtaSyncNext
+Set-Location E:\traecode\UtaSync\UtaSyncNext
 .venv\Scripts\python.exe -m pip install -r requirements-build.txt
 ```
 
