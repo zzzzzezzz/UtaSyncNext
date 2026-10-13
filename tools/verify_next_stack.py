@@ -42,6 +42,11 @@ ENGINE_IMPORTS = ["faster_whisper"]
 LEGACY_PATTERNS = ["_load_v3", "spec_from_file_location", "Cannot load V3", "importlib.util"]
 SCAN_SKIP_DIRS = {".venv", ".engine", ".wheelhouse", "__pycache__", "models_faster", "output", "smoke_media", "test_logs"}
 
+# Check names disabled for this run. A CI checkout has neither the installed
+# engine nor the fonts/ folder that some checks render with, so the workflow
+# names them explicitly instead of leaving a permanently red pipeline.
+SKIP_NAMES: set[str] = set()
+
 
 @dataclass
 class CheckResult:
@@ -71,7 +76,14 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=600, help="Pipeline timeout in seconds.")
     parser.add_argument("--confirm-download", action="store_true", help="Required for profile=download.")
     parser.add_argument("--json-report", default="", help="Optional path to write a JSON report.")
+    parser.add_argument(
+        "--skip",
+        default="",
+        help="Comma-separated check names to skip, for example network-proxy,preset-catalog.",
+    )
     args = parser.parse_args()
+
+    SKIP_NAMES.update(name.strip() for name in args.skip.split(",") if name.strip())
 
     json_report = Path(args.json_report).expanduser().resolve() if args.json_report else None
     os.chdir(NEXT_ROOT)
@@ -159,6 +171,9 @@ def main() -> int:
 
 
 def _add(results: list[CheckResult], name: str, func) -> None:
+    if name in SKIP_NAMES:
+        results.append(CheckResult(name=name, status="SKIP", seconds=0.0, detail="Skipped via --skip."))
+        return
     started = time.monotonic()
     try:
         detail = func()
@@ -207,6 +222,9 @@ def _run_pipeline(results: list[CheckResult], args) -> None:
 
 
 def _run_command(results: list[CheckResult], name: str, command: list[str], timeout: int) -> None:
+    if name in SKIP_NAMES:
+        results.append(CheckResult(name=name, status="SKIP", seconds=0.0, detail="Skipped via --skip."))
+        return
     started = time.monotonic()
     try:
         env = os.environ.copy()

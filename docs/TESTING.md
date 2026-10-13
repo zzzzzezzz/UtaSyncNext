@@ -20,6 +20,22 @@
 \.venv\Scripts\python.exe -m compileall app.py controllers core engine ui utils tools
 ```
 
+## CI（GitHub Actions）
+
+`.github/workflows/verify.yml` 在 `windows-latest` 上跑和本地同一套检查：
+
+```powershell
+python tools/verify_next_stack.py --profile health --skip network-proxy,preset-catalog --json-report test_logs/health.json
+```
+
+只排除两项，因为它们的失败取决于本机环境而不是代码：
+
+- `network-proxy` 需要本机已安装 Next 引擎（`.engine`）才能走到代理预检提示；
+- `preset-catalog` 用 `fonts/` 目录里的字体渲染，而该目录不进 Git。
+
+`--skip` 只影响这一次运行；本地完整执行 `--profile health` 时它们照常跑。CI 里也不调用
+`tools/v3_guard.py`：克隆出来的检出旁边没有 V3 参考目录，guard 会打印跳过说明并以 0 退出。
+
 ## 改动后的推荐顺序
 
 ```powershell

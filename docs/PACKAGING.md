@@ -32,3 +32,17 @@ powershell -ExecutionPolicy Bypass -File tools\link_dist_runtime.ps1
 5. 运行 `check_no_secrets.py` 和 `v3_guard.py verify`。
 
 Launcher 本身不是完整离线安装包；没有外置引擎或模型时，UI 可以打开，但任务预检会明确提示缺少依赖。
+
+## 入库和发布前的检查
+
+1. 提交前跑 `tools\check_no_secrets.py` 和 `tools\v3_guard.py verify`；`.githooks/pre-commit`
+   已经强制这两项，克隆后先执行 `git config core.hooksPath .githooks`。
+2. 确认没有把 `.venv`、`.engine`、`models_faster`、`output`、`performance`、`.cache`、`fonts`、
+   `test_logs`、媒体文件、日志、`user_settings.json`、`user_presets.json` 提交进去。
+3. 跑一遍 `tools\verify_next_stack.py --profile quick`，它比 `health` 多出真实 UI import 检查和假 API 翻译 smoke。
+4. 推送后确认 `.github/workflows/verify.yml` 是绿的。CI 里 `network-proxy` 和 `preset-catalog` 是 SKIP，
+   因为它们分别依赖本机引擎和未入库的 `fonts/`，这是预期结果，不是回归。
+5. 决定是否随仓库分发 `fonts/` 里的字体。思源黑体 CN/JP、霞鹜文楷、M PLUS 1p、Zen Kaku Gothic New
+   都是 SIL OFL 许可，随仓库分发需要一并提供各自的许可文本；不分发则接受新克隆回退到 Windows 自带字体。
+6. 分发打包产物时用 `tools\package_launcher.ps1 -Clean`，并把 `.engine` 和 `models_faster` 作为外置依赖单独说明。
+

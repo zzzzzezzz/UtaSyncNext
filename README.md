@@ -6,6 +6,21 @@ UtaSyncNext 是 UtaSync 的新一代 Windows 桌面版：Python + CustomTkinter 
 
 ## 先跑起来
 
+### 克隆之后
+
+```powershell
+git clone <仓库地址> UtaSyncNext
+Set-Location UtaSyncNext
+git config core.hooksPath .githooks        # 启用提交前的密钥和 V3 检查，只需设置一次
+powershell -ExecutionPolicy Bypass -File tools\bootstrap_venv.ps1
+```
+
+离开原来那台机器时，`fonts/`、`user_settings.json`、`.engine`、`models_faster` 都不在 Git 里：
+前两个缺失时预设会回退到 Windows 自带字体，后两个缺失时任务会在预检阶段停下并提示安装方式。
+检出旁边没有只读 V3 参考目录时，`tools/v3_guard.py` 会打印跳过说明并以 0 退出，不会挡住提交。
+
+### 在这台开发机上
+
 在 Windows PowerShell 中进入 Next 独立仓库：
 
 ```powershell
