@@ -13,6 +13,7 @@ from typing import Any
 
 NEXT_ROOT = Path(__file__).resolve().parents[1]
 V3_ROOT = NEXT_ROOT.parent.resolve()
+V3_MARKER = "core/generator.py"
 STATE_DIR = NEXT_ROOT / ".safety"
 SNAPSHOT_PATH = STATE_DIR / "v3-baseline.json"
 
@@ -61,6 +62,8 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
+        if not _v3_reference_present():
+            return _skip_without_v3(args.command)
         _validate_layout(require_next_git=args.command == "doctor")
         if args.command == "doctor":
             return _doctor()
@@ -70,6 +73,32 @@ def main() -> int:
     except Exception as exc:
         print(f"V3 guard failed: {exc}", file=sys.stderr)
         return 2
+
+
+def _v3_reference_present() -> bool:
+    """True when this checkout really sits beside the UtaSync v3 reference.
+
+    A standalone clone - the CI checkout, another machine, a code-review tool -
+    has no v3 tree next to it, and without one there is nothing this guard can
+    protect. Requiring a v3 marker file as well keeps an unrelated parent
+    repository from being mistaken for the reference.
+    """
+    return (V3_ROOT / ".git").exists() and (V3_ROOT / V3_MARKER).exists()
+
+
+def _skip_without_v3(command: str) -> int:
+    note = (
+        f"V3 guard skipped: no UtaSync v3 reference beside this checkout ({V3_ROOT}). "
+        "Only files inside this repository can be written here."
+    )
+    if command == "doctor":
+        next_git_root = _git_output(NEXT_ROOT, "rev-parse", "--show-toplevel")
+        if Path(next_git_root).resolve() != NEXT_ROOT:
+            raise RuntimeError(f"Next Git root is not isolated: {next_git_root}")
+        print(f"PASS: UtaSyncNext is a standalone Git repository. {note}")
+        return 0
+    print(note)
+    return 0
 
 
 def _doctor() -> int:
