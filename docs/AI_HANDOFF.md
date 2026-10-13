@@ -7,7 +7,7 @@
 
 先阅读：README.md、AGENTS.md、SAFETY.md、docs/ARCHITECTURE.md、docs/MODULE_MAP.md，以及本次目标模块对应的 docs/CONFIGURATION.md 或 docs/PIPELINE.md。当前真实管线入口是 engine.pipeline_worker.run_pipeline_worker；engine/worker_entry.py 只有 demo。
 
-工作边界：只修改当前 UtaSyncNext 独立 Git 仓库。父目录 UtaSync 是只读的 V3 参考，禁止在那里写入、格式化、测试、打包、git add 或 git commit。开始前运行 .venv\Scripts\python.exe tools\v3_guard.py begin，结束后运行 check_no_secrets.py 和 v3_guard.py verify。
+工作边界：只修改当前 UtaSyncNext 独立 Git 仓库。父目录 UtaSync 是只读的 V3 参考，禁止在那里写入、格式化、测试、打包、git add 或 git commit。密钥与隐私边界见 docs/SECURITY.md。开始前运行 .venv\Scripts\python.exe tools\v3_guard.py begin，结束后运行 check_no_secrets.py 和 v3_guard.py verify。
 
 实现前先说明：要改哪些文件、现有契约是什么、会跑哪些本地 smoke。保持 Windows 无黑框的 creationflags、ASR/Demucs/翻译的 multiprocessing.Process、stdout/stderr 伪装接口、Tk 主线程更新、取消后的子进程回收、缓存指纹和输出路径兼容。不要未经验证地把 worker 改成线程、把重库导入放回 Launcher、或在任务中隐式联网下载模型。
 

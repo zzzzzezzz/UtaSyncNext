@@ -72,6 +72,10 @@ python tools/verify_next_stack.py --profile health --skip network-proxy,preset-c
 \.venv\Scripts\python.exe tools\subtitle_reviewer.py --media "E:\path\sample.mp3" --source-srt "E:\path\source.srt" --translated-srt "E:\path\translated.srt"
 ```
 
+## 发布前还要做一次的验证
+
+未自动化的长任务、真实 API 质量检查、干净机器首启、打包成品实机验证，以及性能基线的建立方式，都写在 [`PERFORMANCE_TESTING.md`](PERFORMANCE_TESTING.md)。它们属于"发布前做一次"的性质，不必写进每次提交都要跑的默认验证。
+
 ## 不要把这些测试写成默认 CI
 
 - 真实 API 请求、真实模型下载和大模型加载。

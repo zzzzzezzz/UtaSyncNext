@@ -80,11 +80,14 @@ powershell -ExecutionPolicy Bypass -File tools\bootstrap_venv.ps1 -Engine
 - [`docs/AI_HANDOFF.md`](docs/AI_HANDOFF.md)：可复制给 Trae/Cursor 的交接提示词。
 - [`docs/DECISIONS.md`](docs/DECISIONS.md)：已落地的架构决策和不能随意回退的原因。
 - [`docs/STATUS.md`](docs/STATUS.md)：当前实现、进行中事项和已知限制。
+- [`docs/SECURITY.md`](docs/SECURITY.md)：密钥存放位置、Git 忽略清单，以及推到远端前的检查。
+- [`docs/V3_COMPARISON.md`](docs/V3_COMPARISON.md)：Next 相对 V3 的改进、完整保留的能力和仅存的缺口。
+- [`docs/PERFORMANCE_TESTING.md`](docs/PERFORMANCE_TESTING.md)：性能基线方案和发布前剩余测试清单。
 - [`AGENTS.md`](AGENTS.md)、[`SAFETY.md`](SAFETY.md)：V3 只读边界和安全检查，优先级高于一般开发习惯。
 
 ## 目录边界
 
-`UtaSyncNext` 是独立 Git 仓库；父目录 `E:\traecode\UtaSync` 是冻结的 V3 只读参考。不要在父目录执行写入、格式化、测试、打包、`git add` 或 `git commit`。Next 的本地运行资产包括 `.venv`、`.engine`、`models_faster`、`.cache`、`output`、`fonts`、`test_logs` 和 `user_settings.json`，这些都不应提交；密钥只应保存在被 Git 忽略的 `user_settings.json` 中。默认 UI 由 `MainWindow` 固定使用 Next 工作台，`UTASYNC_UI_VARIANT=classic` 才切换兼容布局。
+`UtaSyncNext` 是独立 Git 仓库；父目录 `E:\traecode\UtaSync` 是冻结的 V3 只读参考。不要在父目录执行写入、格式化、测试、打包、`git add` 或 `git commit`。Next 的本地运行资产包括 `.venv`、`.engine`、`models_faster`、`.cache`、`output`、`fonts`、`test_logs` 和 `user_settings.json`，这些都不应提交；密钥只应保存在被 Git 忽略的 `user_settings.json` 中。推送前的密钥与隐私复核见 [`docs/SECURITY.md`](docs/SECURITY.md)。默认 UI 由 `MainWindow` 固定使用 Next 工作台，`UTASYNC_UI_VARIANT=classic` 才切换兼容布局。
 
 开始工作前运行：
 
