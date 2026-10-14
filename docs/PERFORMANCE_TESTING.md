@@ -19,12 +19,14 @@
 
 当前性能设计包括：阶段计时和错误日志、ASR/翻译分阶段缓存、翻译批次续跑、Demucs 分段和失败重试、CUDA 到 CPU 的回退、取消后的进程回收，以及限制 OMP/MKL/OPENBLAS 并发。GPU 报告目前只记录显卡名称和总显存，不能当作 GPU 已用/峰值显存监控。
 
+现场音乐的 ASR 不使用语音 VAD。VAD 面向讲话停顿，在演唱或 Demucs 人声干声上可能把连续歌声误判为静音，导致长段幻觉或空字幕；打轴缓存指纹已包含这条策略，旧缓存会自动失效。ASR 若没有生成有效字幕也会直接失败并保留已有文件，不会把空 SRT 当作成功结果。
+
 ## 发布优先级
 
 ### P0：发布前必须完成
 
 1. **缓存正确性修复**：音频缓存已增加媒体身份清单和 WAV 有效性检查；同名媒体被替换或缓存损坏时会失效。`health` 已覆盖该场景。
-2. **重新构建 Launcher**：代码改动后重新生成 `dist\UtaSyncNext`，再跑边界审计、体积审计和启动 smoke。旧的 dist 不能代表当前源代码。
+2. **重新构建 Launcher**：代码改动后重新生成 `dist\UtaSyncNext`，再跑边界审计、体积审计、启动 smoke 和 `tools\probe_launcher_close.py`（窗口能出现、关闭后进程自行退出）。旧的 dist 不能代表当前源代码。
 3. **本地闸门**：`health`、`quick`、`check_no_secrets.py`、`v3_guard.py verify` 全部通过。
 4. **公开前隐私复核**：不要提交 `user_settings.json`、`output/`、API trace、媒体、模型或本机路径证据；API trace 即使已脱敏也属于敏感运行产物。
 
@@ -59,6 +61,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\package_launcher.ps1 -Clean
 .\.venv\Scripts\python.exe tools\check_launcher_boundary.py
 .\.venv\Scripts\python.exe tools\check_packaging_size.py
 .\.venv\Scripts\python.exe tools\smoke_icon_assets.py
+.\.venv\Scripts\python.exe tools\probe_launcher_close.py
 ```
 
 真实管线和长任务是显式操作，示例：

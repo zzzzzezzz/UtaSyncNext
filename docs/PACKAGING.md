@@ -30,6 +30,13 @@ powershell -ExecutionPolicy Bypass -File tools\link_dist_runtime.ps1
 3. `.engine` 已按 `requirements-engine.txt` 准备，模型 snapshot 已通过完整性检查。
 4. `user_settings.json`、API Key、媒体、日志、`output`、`.cache` 不进入发布包。
 5. 运行 `check_no_secrets.py` 和 `v3_guard.py verify`。
+6. 直接从 `dist\UtaSyncNext` 启动一次成品，确认窗口出现、并且收到关闭消息后进程自行退出：
+
+   ```powershell
+   .\.venv\Scripts\python.exe tools\probe_launcher_close.py
+   ```
+
+   这个探针只对标题为 `UtaSyncNext` 的窗口发 `WM_CLOSE`。不要用读 `Process.MainWindowHandle` 的 PowerShell 脚本代替：Windows 11 上进程第一个可见顶层窗口常常是 `UAC_InputIndicatorOverlayWnd` 浮层，`CloseMainWindow()` 会打到那个窗口，于是会报出一个应用本身没有的“关不掉”结论。
 
 Launcher 本身不是完整离线安装包；没有外置引擎或模型时，UI 可以打开，但任务预检会明确提示缺少依赖。
 

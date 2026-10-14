@@ -107,7 +107,13 @@ def _normalize_settings(settings: dict[str, Any]) -> dict[str, Any]:
 
     model_aliases = {
         "large-v2": "large-v2 (战神级/推荐)",
-        "large-v3-turbo": "large-v3-turbo (极速高精)",
+        "large-v3-turbo": "large-v3-turbo (极速/演唱慎用)",
+        # The turbo option used to read "极速高精". A model comparison on
+        # the same sung material showed turbo drops lines and can swallow
+        # the opening, so the label now warns about singing. The old label
+        # still maps here, otherwise a saved user_settings.json would
+        # silently fall back to large-v2.
+        "large-v3-turbo (极速高精)": "large-v3-turbo (极速/演唱慎用)",
         "medium": "medium (省显存)",
     }
     settings["model_size"] = model_aliases.get(str(settings.get("model_size", "")), settings["model_size"])

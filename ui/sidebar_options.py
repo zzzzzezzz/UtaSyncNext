@@ -33,7 +33,7 @@ DEFAULT_DEMUCS_OPTION = DEMUCS_OPTIONS[0]
 
 WHISPER_MODEL_OPTIONS = [
     "large-v2 (战神级/推荐)",
-    "large-v3-turbo (极速高精)",
+    "large-v3-turbo (极速/演唱慎用)",
     "large-v3",
     "medium (省显存)",
     "small",

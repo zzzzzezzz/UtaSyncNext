@@ -74,7 +74,7 @@ python tools/verify_next_stack.py --profile health --skip network-proxy,preset-c
 
 ## 发布验收的分级
 
-缓存正确性、编译、核心 smoke、密钥扫描和 V3 边界属于发布前闸门；真实 API、干净机器首启、打包成品实机验证属于有条件的 P1；长视频、Demucs 耐久、真实 Intel/AMD 编码和长期性能基线属于 P2。具体成本和判断见 [`PERFORMANCE_TESTING.md`](PERFORMANCE_TESTING.md)。
+缓存正确性、编译、核心 smoke、密钥扫描、V3 边界和打包后的关闭探针属于发布前闸门；真实 API、干净环境首启、另一台机器的成品验证属于有条件的 P1；长视频、Demucs 耐久、真实 Intel/AMD 编码和长期性能基线属于 P2。具体成本和判断见 [`PERFORMANCE_TESTING.md`](PERFORMANCE_TESTING.md)。
 
 ## 不要把这些测试写成默认 CI
 

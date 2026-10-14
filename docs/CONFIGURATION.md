@@ -59,7 +59,7 @@ worker 运行时还会设置 `UTASYNC_SITE_PACKAGES`、`UTASYNC_HOOKED_ENV`，�
 | `audio_type` | `Live 现场演唱 (常规/摇滚)` | 另有窄画幅高速 Live、柔和 Live、访谈/播客 |
 | `hardware_mode` | `自动匹配显存 (推荐)` | Demucs 启用时生效；自动档按 GPU 显存选择保守/均衡/快速 |
 | `use_demucs` | `先跳过 Demucs (极速/推荐先出轴)` | 访谈模式始终跳过；开启 Demucs 前需准备权重 |
-| `model_size` | `large-v2 (战神级/推荐)` | 可选 `large-v3-turbo`、`large-v3`、`medium`、`small`、`base` |
+| `model_size` | `large-v2 (战神级/推荐)` | 也可选 `large-v3-turbo (极速/演唱慎用)`、`large-v3`、`medium`、`small`、`base`；括号只是提示，实际取值只用空格前的模型名 |
 | `output_mode` | `中日双语字幕` | 或 `纯中文字幕` |
 | `ass_preset` | `默认双语 (纯白+浅灰)` | 选择 `不生成 (仅SRT)` 可跳过 ASS |
 | `ch_font_override` / `jp_font_override` | `跟随预设` | 中文/日文字体覆盖 |

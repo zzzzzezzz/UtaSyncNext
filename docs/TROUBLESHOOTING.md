@@ -136,7 +136,15 @@ API Key 保存在 `user_settings.json`，不是环境变量。不要把该文件
 
 ### 原文 SRT 复用不符合预期
 
-ASR 复用需要同时存在有效 `<任务名>_极致打轴.srt` 和匹配的 `<任务名>_打轴指纹.hash`。v7 指纹包含媒体边缘指纹、模型快照、音频/分离/计时策略；参考歌词不在指纹中，因此改歌词通常不会触发重跑 ASR。媒体内容、模型快照、分离策略或安全区规则变化会使缓存失配。
+ASR 复用需要同时存在有效 `<任务名>_极致打轴.srt` 和匹配的 `<任务名>_打轴指纹.hash`。v8 指纹包含媒体边缘指纹、模型快照、音频/分离/计时策略和现场音乐 VAD 策略；参考歌词不在指纹中，因此改歌词通常不会触发重跑 ASR。媒体内容、模型快照、分离策略、安全区规则或 VAD 策略变化会使缓存失配；早于 v8 的指纹（v6/v7）一律失配并重跑 ASR。
+
+### 歌曲/演唱素材漏字或吞掉开场
+
+演唱与说话不同：带伴奏的歌声更容易被听错，也更容易出现开头幻觉。已实测的差异：
+
+* 同一段日文歌曲，`large-v3-turbo` 只输出 6 段（`large-v2` 为 14 段），并把开场吞成 `作詞・作曲・編曲` 一类幻觉文本；在人声干声上也会用 `ご視聴ありがとうございました。` 覆盖开头。turbo 快约 2.4 倍，但歌曲打轴建议用 `large-v2`，UI 里的选项已标为 `large-v3-turbo (极速/演唱慎用)`。
+* 参考歌词不参与 ASR，也无法修正听错的字。它只用于开头/片尾清理、缺轴报告和翻译提示；听错的地方只能人工复听。
+* 现场音乐模式不再启用语音 VAD。过去的 VAD 会把这些片段压成一条水印幻觉，清理后只剩空 SRT；现在空的 ASR 结果会直接报错并保留已有字幕，不会用空文件覆盖。
 
 ### 歌词缺轴预览没有出现
 
@@ -175,6 +183,7 @@ output/<任务名>/logs/utasyncnext_recovery_YYYYMMDD_HHMMSS.json
 powershell -ExecutionPolicy Bypass -File tools\package_launcher.ps1 -Clean
 .\.venv\Scripts\python.exe tools\check_packaging_size.py
 .\.venv\Scripts\python.exe tools\smoke_icon_assets.py
+.\.venv\Scripts\python.exe tools\probe_launcher_close.py
 .\.venv\Scripts\python.exe tools\check_no_secrets.py
 ```
 
