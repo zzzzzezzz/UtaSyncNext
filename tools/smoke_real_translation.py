@@ -23,6 +23,11 @@ def main() -> int:
     parser.add_argument("--mode", choices=["bilingual", "chinese_only"], default="bilingual")
     parser.add_argument("--proxy", default=None, help="Override API proxy. Use 10808 for local port-only proxy.")
     parser.add_argument("--in-place", action="store_true", help="Translate next to the input SRT instead of a temp copy.")
+    parser.add_argument(
+        "--ignore-cached-lyrics",
+        action="store_true",
+        help="Do not reuse cached_lyrics from user_settings.json when no --lyrics is provided.",
+    )
     args = parser.parse_args()
 
     settings = load_settings()
@@ -54,7 +59,7 @@ def main() -> int:
         work_srt = Path(temp_dir.name) / source_srt.name
         shutil.copy2(source_srt, work_srt)
 
-    if lyrics_path is None:
+    if lyrics_path is None and not args.ignore_cached_lyrics:
         cached_lyrics = str(settings.get("cached_lyrics") or "").strip()
         if cached_lyrics:
             lyrics_root = work_srt.parent

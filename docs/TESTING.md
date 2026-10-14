@@ -56,7 +56,7 @@ python tools/verify_next_stack.py --profile health --skip network-proxy,preset-c
 .\.venv\Scripts\python.exe tools\smoke_translation_guardrails.py
 ```
 
-真实 API 翻译是显式选择：只在本地 `user_settings.json` 已配置并确认额度后运行 `tools\smoke_real_translation.py` 或 `smoke_full_pipeline.py --use-settings-api`。长视频、large-v2/large-v3 下载、Demucs 长任务、删除缓存测试和打包体积测试都应单独安排。
+真实 API 翻译是显式选择：只在本地 `user_settings.json` 已配置、确认额度并确认输入内容可以发送给所配置服务后运行 `tools\smoke_real_translation.py` 或 `smoke_full_pipeline.py --use-settings-api`。测试素材与软件里上次保存的歌词无关时，加 `--ignore-cached-lyrics`，避免把不相关的缓存歌词带入请求。长视频、large-v2/large-v3 下载、Demucs 长任务、删除缓存测试和打包体积测试都应单独安排。
 
 ## 回归证据
 

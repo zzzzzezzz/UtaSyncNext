@@ -34,6 +34,11 @@ def main() -> int:
     parser.add_argument("--demucs", action="store_true", help="Enable Demucs vocal separation. Default skips Demucs.")
     parser.add_argument("--ass", action="store_true", help="Generate ASS after SRT. Default writes SRT only.")
     parser.add_argument("--use-settings-api", action="store_true", help="Use local user_settings.json API fields for real translation.")
+    parser.add_argument(
+        "--ignore-cached-lyrics",
+        action="store_true",
+        help="Do not reuse cached_lyrics from user_settings.json when no --lyrics-file is provided.",
+    )
     parser.add_argument("--translation-mode", default="bilingual", choices=["bilingual", "chinese_only"], help="Translation output mode when --use-settings-api is set.")
     parser.add_argument("--proxy-url", default="", help="Override translation proxy URL when --use-settings-api is set, for example 10808.")
     parser.add_argument("--lyrics-file", default="", help="Optional reference lyrics text file passed to the worker.")
@@ -78,7 +83,7 @@ def main() -> int:
 
         settings = load_settings()
         base_settings = dict(settings)
-        if not lyrics_text:
+        if not lyrics_text and not args.ignore_cached_lyrics:
             lyrics_text = str(settings.get("cached_lyrics") or "")
             if lyrics_text:
                 lyrics_source = "user_settings.json cached_lyrics"
