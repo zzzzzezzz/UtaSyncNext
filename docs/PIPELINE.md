@@ -32,7 +32,7 @@ ASR 生成或命中缓存后都会执行以下检查（失败只记录诊断，�
 
 * 写入 `<任务名>_极致打轴_识别诊断.json`，记录 Faster-Whisper 证据或“仅缓存 SRT 文本”证据以及需人工复核的候选。
 * 有强歌词锚点且证据足够时，开头/结尾窄范围内的明确水印式或低语音误识别可被清理；这是窄规则，不是通用“提高准确率”。
-* 若提供歌词，写入 `<任务名>_极致打轴_歌词缺轴检查.json`（实际文件名由 `opening_lyric_gap_report_path()` 决定），报告可能缺失的开头歌词空档。报告本身是 review-only。
+* 若提供歌词，写入 `<任务名>_极致打轴_歌词缺轴候选.json`（由 `opening_lyric_gap_report_path()` 决定），报告可能缺失的开头歌词空档。报告本身是 review-only。
 
 ## 歌词缺轴复听与独立预览的触发条件
 
@@ -87,7 +87,7 @@ output/<任务名>/
     *_翻译指纹.hash
     *_翻译缓存.json
     *_识别诊断.json
-    *_歌词缺轴检查.json / *_歌词*预览*.srt / *_证据.json
+    *_歌词缺轴候选.json / *_歌词*预览*.srt / *_证据.json
   logs/
     utasyncnext_performance_*.txt/.json
     utasyncnext_error_*.txt

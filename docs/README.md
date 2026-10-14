@@ -6,7 +6,7 @@
 
 | 目标 | 建议顺序 |
 | --- | --- |
-| 软件使用者 | 根目录 [`README.md`](../README.md) → [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) |
+| 软件使用者 | 根目录 [`README.md`](../README.md) → [`OUTPUT_FILES.md`](OUTPUT_FILES.md) → [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) |
 | 维护者快速接手 | [`DEVELOPMENT.md`](DEVELOPMENT.md) → [`ARCHITECTURE.md`](ARCHITECTURE.md) → [`MODULE_MAP.md`](MODULE_MAP.md) |
 | 二次开发 | [`EXTENDING.md`](EXTENDING.md) → [`CONFIGURATION.md`](CONFIGURATION.md) → [`PIPELINE.md`](PIPELINE.md) → [`DECISIONS.md`](DECISIONS.md) |
 | 对比 V3、了解取舍 | [`V3_COMPARISON.md`](V3_COMPARISON.md) → [`DECISIONS.md`](DECISIONS.md) |
