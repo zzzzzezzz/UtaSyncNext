@@ -969,33 +969,22 @@ def _load_user_presets(ass_presets: dict[str, dict[str, Any]]) -> None:
         pass
 
 
-def _try_reuse_asr(
-    expected_srt: Path,
-    hash_path: Path,
-    current_hash: str,
-    *,
-    legacy_hashes: tuple[str, ...] = (),
-) -> str | None:
+def _try_reuse_asr(expected_srt: Path, hash_path: Path, current_hash: str) -> str | None:
+    """Reuse an existing SRT only when the stored marker matches exactly.
+
+    A stale marker is never upgraded in place.  The music VAD change made every
+    pre-v8 marker unsafe, and rewriting the marker during a reuse would make an
+    untrusted SRT look like a fresh cache hit on the next run.
+    """
     if not _is_valid_srt(expected_srt):
         return None
     stored_hash = _read_text(hash_path)
     if stored_hash == current_hash:
         return str(expected_srt)
-    if stored_hash in legacy_hashes:
-        # One-time migration from the pre-v7 marker.  The SRT itself remains
-        # untouched; only the marker is upgraded after a validated reuse.
-        hash_path.write_text(current_hash, encoding="utf-8")
-        return str(expected_srt)
     return None
 
 
-def _asr_cache_reason(
-    expected_srt: Path,
-    hash_path: Path,
-    current_hash: str,
-    *,
-    legacy_hashes: tuple[str, ...] = (),
-) -> str:
+def _asr_cache_reason(expected_srt: Path, hash_path: Path, current_hash: str) -> str:
     if not expected_srt.exists():
         return "没有历史打轴字幕"
     if not _is_valid_srt(expected_srt):
@@ -1003,11 +992,9 @@ def _asr_cache_reason(
     stored_hash = _read_text(hash_path)
     if not stored_hash:
         return "缺少完整打轴标记"
-    if stored_hash == current_hash or stored_hash in legacy_hashes:
+    if stored_hash == current_hash:
         return ""
-    if stored_hash != current_hash:
-        return "媒体、模型、模式或打轴规则已变化"
-    return ""
+    return "媒体、模型、模式或打轴规则已变化"
 
 
 def _translation_batch_cache_count(source_srt: str | Path) -> int:
@@ -1117,7 +1104,13 @@ def _build_legacy_asr_cache_hash(
     layout_policy: Any | None = None,
     reference_lyrics: str = "",
 ) -> str:
-    """Build the pre-v7 marker so existing caches can be upgraded safely."""
+    """Rebuild the pre-v8 marker shape for the cache-invalidation test.
+
+    No runtime path upgrades or reuses a legacy marker any more: after the
+    music VAD policy change every older fingerprint has to miss.  This builder
+    exists so the gate can prove a stale marker is rejected instead of
+    silently accepted.
+    """
     payload: dict[str, Any] = {
         "version": 6,
         "media": media_fingerprint,
