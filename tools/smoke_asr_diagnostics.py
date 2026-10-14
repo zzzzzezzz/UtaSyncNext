@@ -165,6 +165,35 @@ def main() -> int:
         filtered_summary = format_run_summary(generator.last_run_summary)
         _require("已保守过滤 2 条明确误识别" in filtered_summary, "user summary hides suppression")
 
+    with tempfile.TemporaryDirectory(prefix="utasyncnext-music-vad-") as temp_dir:
+        generator = LiveSubtitleGenerator("music_fixture.mp4", output_dir=temp_dir)
+        music_model = _RecordingWhisperModel()
+        generator.model = music_model
+        srt_path = Path(temp_dir) / "music.srt"
+        generator._write_transcription_srt(str(srt_path), "live", skipped_demucs=False)
+        _require(music_model.kwargs["vad_filter"] is False, "live music must not use speech VAD")
+        _require(music_model.kwargs["vad_parameters"] is None, "live music retained stale VAD parameters")
+
+        speech_model = _RecordingWhisperModel()
+        generator.model = speech_model
+        generator._write_transcription_srt(str(Path(temp_dir) / "speech.srt"), "speech", skipped_demucs=True)
+        _require(speech_model.kwargs["vad_filter"] is True, "speech mode must retain VAD")
+        _require(speech_model.kwargs["vad_parameters"]["threshold"] == 0.5, "speech VAD policy changed")
+
+        empty_path = Path(temp_dir) / "empty.srt"
+        empty_path.write_text("previous valid subtitle", encoding="utf-8")
+        generator.model = _EmptyWhisperModel()
+        try:
+            generator._write_transcription_srt(str(empty_path), "live", skipped_demucs=False)
+        except RuntimeError as exc:
+            _require("未生成有效字幕" in str(exc), "empty ASR failure did not explain the problem")
+        else:
+            raise AssertionError("empty ASR output must fail the task")
+        _require(
+            empty_path.read_text(encoding="utf-8") == "previous valid subtitle",
+            "empty ASR output overwrote a prior subtitle",
+        )
+
     print("PASS: ASR diagnostics are review-only")
     print("- Faster-Whisper evidence retained: yes")
     print("- repeated DJ and generic phrases marked: yes")
@@ -253,6 +282,29 @@ class _FakeSuppressionWhisperModel:
             ),
         ]
         return segments, SimpleNamespace(duration=70.0)
+
+
+class _RecordingWhisperModel:
+    def __init__(self) -> None:
+        self.kwargs: dict[str, object] = {}
+
+    def transcribe(self, *_args, **kwargs):
+        self.kwargs = kwargs
+        return [
+            SimpleNamespace(
+                start=1.0,
+                end=4.0,
+                text="これは通常の字幕です",
+                avg_logprob=-0.2,
+                no_speech_prob=0.1,
+                compression_ratio=1.0,
+            )
+        ], SimpleNamespace(duration=5.0)
+
+
+class _EmptyWhisperModel:
+    def transcribe(self, *_args, **_kwargs):
+        return [], SimpleNamespace(duration=5.0)
 
 
 

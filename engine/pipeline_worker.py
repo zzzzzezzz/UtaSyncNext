@@ -178,21 +178,10 @@ def build_pipeline_preview(payload: dict[str, object] | None = None) -> dict[str
             layout_policy=layout_policy,
             reference_lyrics=lyrics_text,
         )
-        legacy_asr_hash = _build_legacy_asr_cache_hash(
-            media_fingerprint=media_fingerprint,
-            audio_type=audio_type,
-            model_size=model_size,
-            model_ref=model_ref,
-            skip_demucs=skip_demucs,
-            hardware_mode=hardware_mode,
-            layout_policy=layout_policy,
-            reference_lyrics=lyrics_text,
-        )
         asr_cache_reason = _asr_cache_reason(
             expected_srt,
             asr_hash_path,
             asr_hash,
-            legacy_hashes=(legacy_asr_hash,),
         )
         asr_cache_hit = not asr_cache_reason
         preview["asr_cache_hit"] = asr_cache_hit
@@ -377,27 +366,15 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
             return
 
         generator = None
-        legacy_asr_hash = _build_legacy_asr_cache_hash(
-            media_fingerprint=media_fingerprint,
-            audio_type=audio_type,
-            model_size=model_size,
-            model_ref=model_ref,
-            skip_demucs=skip_demucs,
-            hardware_mode=hardware_mode,
-            layout_policy=layout_policy,
-            reference_lyrics=lyrics_text,
-        )
         summary["asr_cache_reason"] = _asr_cache_reason(
             expected_srt,
             asr_hash_path,
             asr_hash,
-            legacy_hashes=(legacy_asr_hash,),
         )
         srt_path = _try_reuse_asr(
             expected_srt,
             asr_hash_path,
             asr_hash,
-            legacy_hashes=(legacy_asr_hash,),
         )
         summary["asr_cache_hit"] = bool(srt_path)
         if srt_path:
@@ -456,6 +433,12 @@ def run_pipeline_worker(msg_queue: Queue, cancel_event: Event, payload: dict[str
                 print(f"[识别清理] 已移除 {watermark_cleanup.removed_count} 条已知水印式误识别。")
                 diagnostic_report = ensure_srt_diagnostics(srt_path)
                 summary["asr_watermark_cleanup_count"] = watermark_cleanup.removed_count
+            if not _is_valid_srt(srt_path):
+                asr_hash_path.unlink(missing_ok=True)
+                raise RuntimeError(
+                    "识别结果只包含已确认的水印式误识别，清理后没有可用字幕。"
+                    "请改用 large-v2 或更换人声分离设置后重试。"
+                )
             diagnostic_summary = diagnostic_report.get("summary") or {}
             asr_diagnostics_path = str(diagnostics_path_for_srt(srt_path).resolve())
             summary["asr_review_candidates"] = int(diagnostic_summary.get("review_candidate_count") or 0)
@@ -1099,7 +1082,7 @@ def _build_asr_cache_hash(
     # remains for call-site compatibility and documents that lyric-aware
     # cleanup happens after ASR cache reuse.
     payload: dict[str, Any] = {
-        "version": 7,
+        "version": 8,
         "media": media_fingerprint,
         "audio_type": audio_type,
         "model_size": model_size,
@@ -1108,6 +1091,7 @@ def _build_asr_cache_hash(
         "skip_demucs": skip_demucs,
         "hardware_mode": hardware_mode if not skip_demucs else "low",
         "subtitle_timing_policy": "full_window_reflow_and_conservative_filter_v2",
+        "music_vad_policy": "disabled_for_live_music_v1",
         "opening_cleanup_policy": "lyrics-anchored-opening-cleanup-v2",
         "watermark_cleanup_policy": "watermark-cluster-cleanup-v1",
     }

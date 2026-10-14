@@ -598,15 +598,8 @@ def _check_pipeline_cache_fingerprint() -> str:
             reference_lyrics="Sample Song - Artist\n可信歌词锚点",
         )
         hash_path.write_text(legacy_hash, encoding="utf-8")
-        if not _try_reuse_asr(
-            srt,
-            hash_path,
-            cleanup_with_lyrics,
-            legacy_hashes=(legacy_hash,),
-        ):
-            raise AssertionError("legacy ASR cache should be reusable and upgraded")
-        if hash_path.read_text(encoding="utf-8") != cleanup_with_lyrics:
-            raise AssertionError("legacy ASR cache marker should be upgraded after reuse")
+        if _try_reuse_asr(srt, hash_path, cleanup_with_lyrics):
+            raise AssertionError("pre-fix ASR cache must be invalidated after the music VAD policy changes")
 
         hash_path.write_text(asr_b, encoding="utf-8")
         if not _try_reuse_asr(srt, hash_path, asr_b):

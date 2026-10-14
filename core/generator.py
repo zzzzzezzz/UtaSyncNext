@@ -462,14 +462,19 @@ class LiveSubtitleGenerator:
             silence_ms = 1000
             pad_ms = 200
             max_duration = 8.0
-            use_vad = not skipped_demucs
+            # Silero VAD is tuned for speech and can classify sustained singing
+            # or a Demucs vocal stem as silence.  That previously collapsed a
+            # full song into one watermark hallucination (or an empty SRT).
+            # Whisper already has its own no-speech handling, so music modes
+            # intentionally decode the complete timeline.
+            use_vad = False
         elif audio_type == "live_soft":
             prompt = "これはライブ音楽の歌詞です。正確に書き起こしてください。"
             vad_threshold = 0.3
             silence_ms = 1000
             pad_ms = 200
             max_duration = 8.0
-            use_vad = not skipped_demucs
+            use_vad = False
         else:
             prompt = "これは日本語のインタビューや日常会話です。正確に書き起こしてください。"
             vad_threshold = 0.5
@@ -806,6 +811,14 @@ class LiveSubtitleGenerator:
             if pending_segment is not None and pending_record is not None:
                 emit_segment(pending_segment, pending_record, pending_position, None)
 
+        if valid_index == 1:
+            Path(temp_srt_path).unlink(missing_ok=True)
+            self.last_run_summary["asr_empty_result"] = True
+            raise RuntimeError(
+                "语音识别未生成有效字幕。请检查素材是否包含可辨认的人声，"
+                "或改用 large-v2 / 关闭人声分离后重试。"
+            )
+
         os.replace(temp_srt_path, srt_path)
         self.last_run_summary["subtitle_density_splits"] = split_source_segments
         self.last_run_summary["subtitle_density_extra_cues"] = extra_cues
@@ -831,8 +844,6 @@ class LiveSubtitleGenerator:
             print(f"字幕整理：已自动拆分 {split_source_segments} 条过长字幕，新增 {extra_cues} 个连续时间轴。")
         if suppressed_segments:
             print(f"字幕整理：已保守过滤 {len(suppressed_segments)} 条明显误识别，详情见诊断文件。")
-        if valid_index == 1:
-            print("[ASR] No valid subtitle segments were emitted.")
 
     def _load_whisper_model(self, model_size: str) -> object:
         from faster_whisper import WhisperModel
