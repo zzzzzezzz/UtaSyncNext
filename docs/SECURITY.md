@@ -6,7 +6,8 @@
 
 ## 密钥只存在于一个本地文件
 
-- 唯一存放点是工作区根目录的 `user_settings.json`，`api_key` 和 `api_key_design` 以明文写在里面。
+- 存放点是工作区根目录的 `user_settings.json`，`api_key` 和 `api_key_design` 以明文写在里面。
+- 打包目录里的 `dist\UtaSyncNext\user_settings.json` 是同一份状态的副本（打包脚本会在重建前把它移出、重建后放回），所以 dist 同样带明文 Key。分发成品时只发 `UtaSyncNext.exe` 和 `_internal`，不要整目录压缩。
 - 代码不会从环境变量、`.env`、注册表或系统凭据管理器补填密钥；UI 里不填就一直为空（见 [`CONFIGURATION.md`](CONFIGURATION.md)）。
 - 翻译预设只写 Base URL 和模型名，不含密钥。
 - `user_settings.json` 由 `.gitignore` 拦截，永远不应该进入 Git。

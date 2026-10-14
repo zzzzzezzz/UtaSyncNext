@@ -28,7 +28,7 @@ powershell -ExecutionPolicy Bypass -File tools\link_dist_runtime.ps1
 1. `check_launcher_boundary.py` 和 `check_packaging_size.py` 通过。
 2. Launcher 冷启动不加载重 AI 库，外部 FFmpeg 仍由用户安装并加入 PATH。
 3. `.engine` 已按 `requirements-engine.txt` 准备，模型 snapshot 已通过完整性检查。
-4. `user_settings.json`、API Key、媒体、日志、`output`、`.cache` 不进入发布包。
+4. `user_settings.json`、API Key、媒体、日志、`output`、`.cache` 不进入发布包。注意 `dist\UtaSyncNext` 是本机运行目录，里面保留着你自己的 `user_settings.json`（含明文 API Key）、`output`、`.cache` 和 `performance`；要发给别人时只打包 `UtaSyncNext.exe` 和 `_internal`，或者先把这些运行文件删掉再压缩。
 5. 运行 `check_no_secrets.py` 和 `v3_guard.py verify`。
 6. 直接从 `dist\UtaSyncNext` 启动一次成品，确认窗口出现、并且收到关闭消息后进程自行退出：
 
