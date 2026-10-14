@@ -1,6 +1,6 @@
 # UtaSyncNext 管线与缓存
 
-复核日期：2026-10-13
+复核日期：2026-10-14
 
 UtaSyncNext 是本地桌面管线。UI 只收集媒体、歌词和设置，然后把 payload 交给独立的 multiprocessing worker；worker 通过 `log`、`status`、`progress`、`done`、`error` 消息回传状态。UI 轮询队列，取消时先设置事件，worker 超过约 2 秒仍未退出才终止进程树。
 
@@ -13,6 +13,10 @@ UtaSyncNext 是本地桌面管线。UI 只收集媒体、歌词和设置，然�
 5. 先检查本地 Faster-Whisper 模型快照和 Demucs 权重（如果启用）。没有完整模型会拒绝自动下载并提示使用模型管理/下载工具。
 6. 运行或复用 ASR。ASR 可能先用 FFmpeg 抽取 WAV，再按 Demucs 策略使用源音频或 `htdemucs_ft` 人声；Faster-Whisper 优先 CUDA，CUDA DLL/运行时失败会回退 CPU `int8`。输出原文 SRT 后进入后处理。
 7. 若配置了 API Key，翻译器按批次调用 OpenAI-compatible Chat Completions；没有 Key 则保留原文 SRT 并跳过翻译。翻译成功后可生成 ASS，最后写性能报告并把工件路径发回 UI。
+
+## 音频缓存身份
+
+音频准备阶段另有一个 `audio_cache_manifest.json`。它记录绝对媒体路径、文件大小、修改时间和首尾边缘摘要；源 WAV 与 Demucs 人声 WAV 只有在媒体身份匹配且 WAV 结构有效时才会复用。同名文件被替换、旧版本缓存没有清单或缓存文件损坏时，会先清理音频/分离缓存，再重新提取。这个清单只保护音频缓存，不改变 v7 的字幕指纹契约。
 
 ## v7 ASR 指纹和 ASR 后处理
 
@@ -71,6 +75,7 @@ output/<任务名>/
   audio/
     <hash>_源音频.wav
     <任务名>_纯净人声.wav       # 启用 Demucs 时
+    audio_cache_manifest.json  # 媒体身份和 WAV 缓存契约
     chunks/                    # Demucs 分段和日志
   subtitles/
     <任务名>_极致打轴.srt       # ASR 原文

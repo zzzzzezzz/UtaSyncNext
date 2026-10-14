@@ -2,7 +2,7 @@
 
 UtaSyncNext 是 UtaSync 的新一代 Windows 桌面版：Python + CustomTkinter 的本地字幕工作台。它不是 Next.js、React 或 Web 服务项目，仓库中没有 `package.json`、npm 脚本、HTTP 路由或登录服务。实际开发入口是 `app.py`，实际长任务入口是 `engine.pipeline_worker.run_pipeline_worker`。
 
-这份 README 是给维护者以及 Trae、Cursor 等代码工具的当前事实入口。历史路线图和父目录 V3 说明仍有参考价值，但若与代码冲突，以 `UtaSyncNext` 当前源代码和测试为准。
+这份 README 是软件使用者的快速入口，也给维护者提供当前事实基线。Trae、Cursor 等代码工具请从 [`docs/README.md`](docs/README.md) 和 [`docs/AI_HANDOFF.md`](docs/AI_HANDOFF.md) 进入；历史路线图和父目录 V3 说明仅作参考，若与代码冲突，以 `UtaSyncNext` 当前源代码和测试为准。
 
 ## 先跑起来
 
@@ -25,7 +25,7 @@ powershell -ExecutionPolicy Bypass -File tools\bootstrap_venv.ps1
 
 ```powershell
 Set-Location E:\traecode\UtaSync\UtaSyncNext
-\.venv\Scripts\python.exe tools\v3_guard.py doctor
+.\.venv\Scripts\python.exe tools\v3_guard.py doctor
 ```
 
 首次安装轻量 UI 环境；需要真正执行 ASR/Demucs 时，再安装外置重引擎：
@@ -43,7 +43,7 @@ powershell -ExecutionPolicy Bypass -File tools\bootstrap_venv.ps1 -Engine
 .\run_next.cmd
 ```
 
-`run_next.ps1`/`.cmd` 会使用 `.venv\Scripts\python.exe`，将 HuggingFace 和 XDG 缓存重定向到 Next 自己的 `.cache`。直接运行 `\.venv\Scripts\python.exe app.py` 也可以；入口会再次应用同一缓存策略。
+`run_next.ps1`/`.cmd` 会使用 `.venv\Scripts\python.exe`，将 HuggingFace 和 XDG 缓存重定向到 Next 自己的 `.cache`。直接运行 `.\.venv\Scripts\python.exe app.py` 也可以；入口会再次应用同一缓存策略。
 
 最小本地验证：
 
@@ -52,7 +52,7 @@ powershell -ExecutionPolicy Bypass -File tools\bootstrap_venv.ps1 -Engine
 .\.venv\Scripts\python.exe tools\verify_next_stack.py --profile quick
 ```
 
-`health` 仍会运行大量本地 smoke、Tk 预览和回归检查；它不是只检查 Python 包的秒级检查。它跳过双语/纯中文真实翻译 smoke 和 UI import 检查。详见 [`TEST_PLAN.md`](TEST_PLAN.md) 和 [`docs/TESTING.md`](docs/TESTING.md)。
+`health` 仍会运行大量本地 smoke、Tk 预览和回归检查；它不是只检查 Python 包的秒级检查。它跳过双语/纯中文假 API translator smoke 和 UI import 检查，后两项由 `quick` 补充。详见 [`TEST_PLAN.md`](TEST_PLAN.md) 和 [`docs/TESTING.md`](docs/TESTING.md)。
 
 ## 当前能力
 
@@ -68,22 +68,11 @@ powershell -ExecutionPolicy Bypass -File tools\bootstrap_venv.ps1 -Engine
 
 ## 代码和文档导航
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)：启动链路、进程/线程边界、消息协议和状态机。
-- [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md)：当前目录和模块职责索引。
-- [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)：安装、调试、修改和提交流程。
-- [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)：设置键、默认值、兼容别名和运行目录。
-- [`docs/PIPELINE.md`](docs/PIPELINE.md)：ASR、翻译、ASS、压制、缓存和输出契约。
-- [`docs/TESTING.md`](docs/TESTING.md)：验证命令矩阵及联网/大模型风险边界。
-- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)：常见启动、模型、FFmpeg、CUDA、代理和缓存问题。
-- [`docs/PACKAGING.md`](docs/PACKAGING.md)：Launcher 构建和发布边界。
-- [`docs/EXTENDING.md`](docs/EXTENDING.md)：新增设置、UI、协议、模型和 smoke 的方式。
-- [`docs/AI_HANDOFF.md`](docs/AI_HANDOFF.md)：可复制给 Trae/Cursor 的交接提示词。
-- [`docs/DECISIONS.md`](docs/DECISIONS.md)：已落地的架构决策和不能随意回退的原因。
-- [`docs/STATUS.md`](docs/STATUS.md)：当前实现、进行中事项和已知限制。
-- [`docs/SECURITY.md`](docs/SECURITY.md)：密钥存放位置、Git 忽略清单，以及推到远端前的检查。
-- [`docs/V3_COMPARISON.md`](docs/V3_COMPARISON.md)：Next 相对 V3 的改进、完整保留的能力和仅存的缺口。
-- [`docs/PERFORMANCE_TESTING.md`](docs/PERFORMANCE_TESTING.md)：性能基线方案和发布前剩余测试清单。
-- [`AGENTS.md`](AGENTS.md)、[`SAFETY.md`](SAFETY.md)：V3 只读边界和安全检查，优先级高于一般开发习惯。
+不要从这里逐篇翻阅 `docs/`。先打开 [`docs/README.md`](docs/README.md)，它按软件使用、二次开发、验证发布和 Trae/Cursor 交接分组，并给出每类的最短阅读路径。
+
+普通使用者主要需要：本页的启动说明、[`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) 的排障说明，以及软件内的设置和输出提示。维护者需要 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)、[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)、[`docs/PIPELINE.md`](docs/PIPELINE.md) 和 [`docs/TESTING.md`](docs/TESTING.md)。发布前再看 [`docs/PACKAGING.md`](docs/PACKAGING.md)、[`docs/SECURITY.md`](docs/SECURITY.md)、[`docs/STATUS.md`](docs/STATUS.md) 和 [`docs/PERFORMANCE_TESTING.md`](docs/PERFORMANCE_TESTING.md)。
+
+[`AGENTS.md`](AGENTS.md) 和 [`SAFETY.md`](SAFETY.md) 是仓库边界规则；[`docs/AI_HANDOFF.md`](docs/AI_HANDOFF.md) 是给 Trae/Cursor 复制使用的短入口。
 
 ## 目录边界
 
@@ -106,4 +95,4 @@ powershell -ExecutionPolicy Bypass -File tools\bootstrap_venv.ps1 -Engine
 
 父目录的《UtaSyncNext 需求与重构计划.md》描述过渡路线，父目录的《UtaSync 架构白皮书与重构指引.md》主要描述 V3。它们不应被当成当前 Next 的模块树：当前管线在 `engine/pipeline_worker.py`，`engine/worker_entry.py` 只有轻量 demo 入口；规划中的 `core/pipeline_runner.py`、`utils/hash_manager.py` 和 `utils/paths.py` 当前不存在。
 
-复核日期：2026-10-13。
+复核日期：2026-10-14。

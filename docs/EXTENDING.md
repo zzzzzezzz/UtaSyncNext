@@ -1,6 +1,6 @@
 # 二次开发指南
 
-先阅读 [`README.md`](../README.md)、[`AGENTS.md`](../AGENTS.md) 和 [`ARCHITECTURE.md`](ARCHITECTURE.md)，再只打开本次目标模块。所有改动都限定在 `UtaSyncNext`，开始前执行 `tools\v3_guard.py begin`。
+先阅读 [`README.md`](../README.md)、[`AGENTS.md`](../AGENTS.md) 和 [`ARCHITECTURE.md`](ARCHITECTURE.md)，再只打开本次目标模块。所有改动都限定在 `UtaSyncNext`，开始前执行 `.\.venv\Scripts\python.exe tools\v3_guard.py begin`。
 
 ## 添加或修改设置
 
@@ -39,17 +39,17 @@
 内置样式在 `core.ass_maker.py`，映射/布局在 `core.ass_config.py` 和 `core.subtitle_policy.py`，字体导入和搭配在 `ui.font_catalog.py`。保留 `fonts` 目录外置策略和用户预设的 `__meta__` 删除/改名记录。运行：
 
 ```powershell
-\.venv\Scripts\python.exe tools\smoke_preset_store.py
-\.venv\Scripts\python.exe tools\smoke_font_pair_catalog.py
-\.venv\Scripts\python.exe tools\smoke_style_workbench_preview.py
+.\.venv\Scripts\python.exe tools\smoke_preset_store.py
+.\.venv\Scripts\python.exe tools\smoke_font_pair_catalog.py
+.\.venv\Scripts\python.exe tools\smoke_style_workbench_preview.py
 ```
 
 ## 提交前最小清单
 
 ```powershell
-\.venv\Scripts\python.exe tools\verify_next_stack.py --profile health
-\.venv\Scripts\python.exe tools\check_no_secrets.py
-\.venv\Scripts\python.exe tools\v3_guard.py verify
+.\.venv\Scripts\python.exe tools\verify_next_stack.py --profile health
+.\.venv\Scripts\python.exe tools\check_no_secrets.py
+.\.venv\Scripts\python.exe tools\v3_guard.py verify
 git status --short
 ```
 

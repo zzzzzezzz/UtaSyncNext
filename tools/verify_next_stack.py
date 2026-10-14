@@ -346,32 +346,72 @@ def _check_audio_cache_policy() -> str:
     from core.generator import LiveSubtitleGenerator
 
     with tempfile.TemporaryDirectory(prefix="utasyncnext-cache-policy-") as temp_dir:
-        generator = LiveSubtitleGenerator("cache_policy_fixture.mp4", output_dir=temp_dir)
+        media_path = Path(temp_dir) / "cache_policy_fixture.mp4"
+        media_path.write_bytes(b"media-v1" * 2048)
+        output_root = Path(temp_dir) / "output"
+        generator = LiveSubtitleGenerator(str(media_path), output_dir=str(output_root))
         audio_path = Path(generator.audio_path)
         vocal_path = Path(generator.final_vocal_path)
         audio_path.parent.mkdir(parents=True, exist_ok=True)
 
-        audio_path.write_bytes(b"source-audio-cache")
+        def write_wav(path: Path) -> None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with wave.open(str(path), "wb") as handle:
+                handle.setnchannels(1)
+                handle.setsampwidth(2)
+                handle.setframerate(16000)
+                handle.writeframes(b"\x00\x00" * 160)
+
+        identity = generator._ensure_audio_cache_identity()
+        write_wav(audio_path)
+        generator._write_audio_cache_manifest(identity)
         Path(generator.strategy_flag_path).write_text("demucs", encoding="utf-8")
         if not generator._can_reuse_vocal_cache("skip"):
-            raise AssertionError("skip strategy should reuse source audio cache independently of strategy flag")
+            raise AssertionError("skip strategy should reuse a matching source audio cache")
         if Path(generator._cache_path_for_strategy("skip")) != audio_path:
             raise AssertionError("skip strategy should map to source audio cache")
 
         if generator._can_reuse_vocal_cache("demucs"):
             raise AssertionError("demucs strategy should not be reusable before vocal cache exists")
-        vocal_path.write_bytes(b"demucs-vocal-cache")
+        write_wav(vocal_path)
         if not generator._can_reuse_vocal_cache("demucs"):
             raise AssertionError("demucs strategy should reuse Demucs vocal cache")
         if Path(generator._cache_path_for_strategy("demucs")) != vocal_path:
             raise AssertionError("demucs strategy should map to vocal cache")
+
+        vocal_path.write_bytes(b"truncated-but-nonempty")
+        if generator._can_reuse_vocal_cache("demucs"):
+            raise AssertionError("a truncated vocal cache must not be treated as reusable")
+        write_wav(vocal_path)
 
         generator.vocal_path = str(vocal_path)
         generator.cleanup_temp_files()
         if not audio_path.exists() or not vocal_path.exists():
             raise AssertionError("cleanup should keep both source and Demucs vocal caches")
 
-    return "source and Demucs caches are independent and survive cleanup"
+        media_path.write_bytes(b"media-v2" * 2048)
+        replacement = LiveSubtitleGenerator(str(media_path), output_dir=str(output_root))
+        replacement._ensure_audio_cache_identity()
+        if audio_path.exists() or vocal_path.exists():
+            raise AssertionError("replacing same-name media must invalidate old audio caches")
+        if replacement._can_reuse_vocal_cache("skip") or replacement._can_reuse_vocal_cache("demucs"):
+            raise AssertionError("replacing same-name media must not reuse old audio caches")
+
+        media_path.write_bytes(b"media-v3" * 2048)
+        restored = LiveSubtitleGenerator(str(media_path), output_dir=str(output_root))
+        identity = restored._ensure_audio_cache_identity()
+        write_wav(Path(restored.audio_path))
+        write_wav(Path(restored.final_vocal_path))
+        restored._write_audio_cache_manifest(identity)
+        other_media = Path(temp_dir) / "other" / media_path.name
+        other_media.parent.mkdir(parents=True, exist_ok=True)
+        other_media.write_bytes(b"other-media" * 2048)
+        other_path = LiveSubtitleGenerator(str(other_media), output_dir=str(output_root))
+        other_path._ensure_audio_cache_identity()
+        if Path(restored.audio_path).exists() or Path(restored.final_vocal_path).exists():
+            raise AssertionError("different same-stem media must not share old audio caches")
+
+    return "audio caches are media-bound, strategy-specific, and survive normal cleanup"
 
 
 def _check_demucs_chunk_resume() -> str:

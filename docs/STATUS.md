@@ -1,4 +1,4 @@
-# 当前状态（2026-10-13）
+# 当前状态（2026-10-14）
 
 ## 已实现
 
@@ -11,7 +11,7 @@
 - Launcher boundary、打包审计、回归工作区和大量本地 smoke。
 - 第二次启动（源码运行或打包后的 exe）会把已运行的窗口带到前台，只有确实找不到窗口时才提示恢复方式。
 - 硬字幕压制按 NVENC → Intel QSV → AMD AMF → CPU 软压 逐级回退，日志会写明每一步的失败原因。
-- 文档体系：README 加 `docs/` 15 篇，以及 GitHub Actions 上的 `verify` 工作流。
+- 文档体系：README 加 `docs/` 16 篇，以及 GitHub Actions 上的 `verify` 工作流。
 
 ## 仍在演进
 
@@ -21,13 +21,11 @@
 
 ## 发布（杀青）前还剩的事
 
-属于"发布前做一次"、不必进默认 CI 的验证，清单和跑法在 [`PERFORMANCE_TESTING.md`](PERFORMANCE_TESTING.md)：
+当前没有待做的性能重构。缓存正确性修复和本地 health 闸门已经完成；发布前按 [`PERFORMANCE_TESTING.md`](PERFORMANCE_TESTING.md) 分级处理：
 
-- 真实 API 翻译跑通双语和纯中文，并人工检查断句与文学质量。
-- 干净机器首启：没有 `.engine`、没有模型、没有 `fonts/`、没有 `user_settings.json`。
-- 长视频加 Demucs 的耐久验证。
-- 打包成品拷到另一台机器双击验证。
-- 记录第一份性能基线。
+- **P0**：用最新源代码重建 Launcher，跑打包边界/体积/启动 smoke、`quick`、密钥扫描和 V3 边界检查。
+- **P1**：有条件时做一次真实 API 人工检查、干净环境首启、另一台 Windows 成品短任务，以及取消/恢复抽查。
+- **P2**：固定性能基线、真实 Intel/AMD 编码、长 Demucs 耐久、动态线程和 GPU 峰值监控，发布后继续做，不阻塞当前入库。
 
 需要你拍板的三件事：
 
@@ -35,7 +33,7 @@
 2. 是否加 `LICENSE`（MIT、Apache-2.0，或不加）。
 3. 推到哪个远端（GitHub、Gitee 或自建 GitLab）；Next 目前没有配置任何 remote。
 
-密钥与隐私的完整复核见 [`SECURITY.md`](SECURITY.md)：已扫描 212 个已跟踪文件和全部 29 个提交，没有真实密钥。`test_workspace` 证据里含本机绝对路径，属于可选的清理项。
+密钥与隐私的完整复核见 [`SECURITY.md`](SECURITY.md)；发布前要在最终提交之后重新运行扫描。`test_workspace` 证据里含本机绝对路径，属于可选的清理项。
 
 ## 当前限制
 

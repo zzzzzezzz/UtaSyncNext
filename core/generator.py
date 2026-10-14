@@ -68,6 +68,8 @@ class LiveSubtitleGenerator:
         self.audio_path = os.path.join(self.audio_dir, f"{self.safe_name}_源音频.wav")
         self.final_vocal_path = os.path.join(self.audio_dir, f"{self.base_name}_纯净人声.wav")
         self.strategy_flag_path = os.path.join(self.audio_dir, "separation_strategy.txt")
+        self.cache_manifest_path = os.path.join(self.audio_dir, "audio_cache_manifest.json")
+        self._cache_media_fingerprint: dict[str, object] | None = None
         self.vocal_path = self.audio_path
         self.cancel_event = None
         self.model = None
@@ -108,7 +110,8 @@ class LiveSubtitleGenerator:
         try:
             self._raise_if_cancelled("任务尚未开始即被取消")
             strategy = "skip" if skip_separation else "demucs"
-            audio_cache_hit = self._can_reuse_vocal_cache(strategy)
+            media_fingerprint = self._ensure_audio_cache_identity()
+            audio_cache_hit = self._can_reuse_vocal_cache(strategy, media_fingerprint)
             self.last_run_summary["audio_cache_hit"] = audio_cache_hit
 
             if audio_cache_hit:
@@ -122,11 +125,15 @@ class LiveSubtitleGenerator:
                 self.last_run_summary["audio_extract_elapsed_seconds"] = round(
                     time.perf_counter() - stage_started, 3
                 )
+                # Record the source identity as soon as extraction succeeds so
+                # an interrupted Demucs run can resume its valid chunks.
+                self._write_audio_cache_manifest(media_fingerprint)
                 stage_started = time.perf_counter()
                 self.isolate_vocals(skip=skip_separation, hardware_mode=hardware_mode, progress_cb=progress_cb)
                 self.last_run_summary["demucs_elapsed_seconds"] = round(
                     time.perf_counter() - stage_started, 3
                 )
+                self._write_audio_cache_manifest(media_fingerprint)
                 Path(self.strategy_flag_path).write_text(strategy, encoding="utf-8")
 
             srt_path = self.transcribe_to_srt(
@@ -158,7 +165,7 @@ class LiveSubtitleGenerator:
             progress_cb(0.02, "🎵 提取源音频...")
         print("🎤 [步骤 1/4] 正在提取/转换音频格式...")
 
-        if os.path.exists(self.audio_path) and os.path.getsize(self.audio_path) > 0:
+        if self._is_valid_wav_cache(self.audio_path):
             return self.audio_path
 
         try:
@@ -314,17 +321,84 @@ class LiveSubtitleGenerator:
         except (OSError, EOFError, wave.Error):
             return False
 
-    def _can_reuse_vocal_cache(self, strategy: str) -> bool:
+    def _can_reuse_vocal_cache(
+        self,
+        strategy: str,
+        media_fingerprint: dict[str, object] | None = None,
+    ) -> bool:
         cache_path = self._cache_path_for_strategy(strategy)
-        return os.path.exists(cache_path) and os.path.getsize(cache_path) > 0
+        current = media_fingerprint or self._cache_media_fingerprint or self._media_fingerprint()
+        manifest = self._read_audio_cache_manifest()
+        return bool(
+            manifest
+            and manifest.get("media") == current
+            and self._is_valid_wav_cache(cache_path)
+        )
 
     def _invalidate_vocal_cache_if_needed(self) -> None:
-        if os.path.exists(self.final_vocal_path):
-            print("   -> 🔄 检测到分离策略变更，已作废旧缓存，重新提取音频...")
+        self._invalidate_audio_cache()
+
+    def _ensure_audio_cache_identity(self) -> dict[str, object]:
+        current = self._media_fingerprint()
+        stored = self._read_audio_cache_manifest()
+        if not stored or stored.get("media") != current:
+            if stored or any(
+                os.path.exists(path)
+                for path in (self.audio_path, self.final_vocal_path, self.strategy_flag_path)
+            ):
+                print("   -> 🔄 检测到媒体身份变化或旧版音频缓存，已清理旧缓存。")
+            self._invalidate_audio_cache()
+        self._cache_media_fingerprint = current
+        return current
+
+    def _invalidate_audio_cache(self) -> None:
+        for path in (
+            self.audio_path,
+            self.final_vocal_path,
+            self.strategy_flag_path,
+            self.cache_manifest_path,
+        ):
             try:
-                os.remove(self.final_vocal_path)
+                Path(path).unlink(missing_ok=True)
             except OSError:
                 pass
+        shutil.rmtree(os.path.join(self.audio_dir, "chunks"), ignore_errors=True)
+
+    def _media_fingerprint(self) -> dict[str, object]:
+        path = Path(self.video_path).resolve()
+        stat = path.stat()
+        edge_hash = hashlib.md5()
+        with path.open("rb") as file:
+            edge_hash.update(file.read(1024 * 1024))
+            if stat.st_size > 1024 * 1024:
+                file.seek(max(0, stat.st_size - 1024 * 1024))
+                edge_hash.update(file.read(1024 * 1024))
+        return {
+            "path": str(path),
+            "name": path.name,
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+            "edge_md5": edge_hash.hexdigest(),
+        }
+
+    def _read_audio_cache_manifest(self) -> dict[str, object]:
+        try:
+            payload = json.loads(Path(self.cache_manifest_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def _write_audio_cache_manifest(self, media_fingerprint: dict[str, object]) -> None:
+        payload = {
+            "version": 1,
+            "media": media_fingerprint,
+            "source_audio": Path(self.audio_path).name,
+            "vocal_audio": Path(self.final_vocal_path).name,
+        }
+        _atomic_write_text(
+            Path(self.cache_manifest_path),
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+        )
 
     def _cache_path_for_strategy(self, strategy: str) -> str:
         return self.audio_path if strategy == "skip" else self.final_vocal_path

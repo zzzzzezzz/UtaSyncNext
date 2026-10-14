@@ -1,8 +1,8 @@
 # UtaSyncNext 故障排查
 
-复核日期：2026-10-13
+面向：软件使用者和需要协助排障的维护者。复核日期：2026-10-14。
 
-先确认这是 Windows/Python 桌面程序：不要用 `npm run dev`、Next.js 路由或浏览器环境来排查。下面命令都在 `UtaSyncNext/` 目录执行，优先使用 `.venv/Scripts/python.exe`。
+先确认这是 Windows/Python 桌面程序：不要用 `npm run dev`、Next.js 路由或浏览器环境来排查。下面命令都在 `UtaSyncNext/` 目录执行，优先使用 `.\.venv\Scripts\python.exe`。
 
 ## 快速检查
 
@@ -10,17 +10,17 @@
 cd E:\traecode\UtaSync\UtaSyncNext
 
 # 只检查引擎目录、模块版本和 CUDA DLL；不加载模型
-.venv\Scripts\python.exe tools\check_engine_runtime.py
+.\.venv\Scripts\python.exe tools\check_engine_runtime.py
 
 # 深度检查会导入 torch 并查询 CUDA
-.venv\Scripts\python.exe tools\check_engine_runtime.py --deep
+.\.venv\Scripts\python.exe tools\check_engine_runtime.py --deep
 
-# 分层验证：health/quick 不下载模型；network/model/full 可能访问模型源
-.venv\Scripts\python.exe tools\verify_next_stack.py --profile health
-.venv\Scripts\python.exe tools\verify_next_stack.py --profile quick
+# 分层验证：health/quick 不联网；network 会访问模型源，model 只加载本地模型，full 会组合联网与真实管线
+.\.venv\Scripts\python.exe tools\verify_next_stack.py --profile health
+.\.venv\Scripts\python.exe tools\verify_next_stack.py --profile quick
 
 # 仅检查模型源清单（是否联网由参数决定）
-.venv\Scripts\python.exe tools\check_model_sources.py --help
+.\.venv\Scripts\python.exe tools\check_model_sources.py --help
 ```
 
 不要为了排查而直接运行真实模型、API 或下载命令；先用 `health`/`quick` 和日志定位问题。需要网络模型源检查时，再明确选择 `network` 或 `model` profile，并准备好代理和磁盘空间。
@@ -49,7 +49,7 @@ UI 依赖和重型引擎分开。安装引擎：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\bootstrap_venv.ps1 -Engine
-.venv\Scripts\python.exe tools\check_engine_runtime.py
+.\.venv\Scripts\python.exe tools\check_engine_runtime.py
 ```
 
 如果重型环境不在 `.engine`，设置 `UTASYNCNEXT_ENGINE_ROOT` 指向一个包含 `Scripts` 和 `Lib/site-packages` 的虚拟环境。不要把 Torch/Demucs 直接装进父目录 v3 环境来“碰运气”；Next 的定位器只检查 Next 自己的环境。
@@ -94,8 +94,8 @@ ffprobe -version
 任务阶段只接受 `models_faster/` 下通过完整性检查的本地快照。检查模型状态：
 
 ```powershell
-.venv\Scripts\python.exe tools\verify_model_download.py --help
-.venv\Scripts\python.exe tools\verify_next_stack.py --profile health
+.\.venv\Scripts\python.exe tools\verify_model_download.py --help
+.\.venv\Scripts\python.exe tools\verify_next_stack.py --profile health
 ```
 
 使用 UI 的引擎/模型管理器，或在确认网络、源和磁盘空间后使用模型下载工具。模型源失败时可在 UI 设置官方源、`hf-mirror.com`、自定义 endpoint 和代理；缺模型不会在任务中隐式联网。
@@ -171,19 +171,19 @@ output/<任务名>/logs/utasyncnext_recovery_YYYYMMDD_HHMMSS.json
 轻量 launcher 不包含 Torch、Demucs、Faster-Whisper、CUDA DLL 或模型。打包前后使用：
 
 ```powershell
-.venv\Scripts\python.exe tools\check_launcher_boundary.py
+.\.venv\Scripts\python.exe tools\check_launcher_boundary.py
 powershell -ExecutionPolicy Bypass -File tools\package_launcher.ps1 -Clean
-.venv\Scripts\python.exe tools\check_packaging_size.py
-.venv\Scripts\python.exe tools\smoke_icon_assets.py
-.venv\Scripts\python.exe tools\check_no_secrets.py
+.\.venv\Scripts\python.exe tools\check_packaging_size.py
+.\.venv\Scripts\python.exe tools\smoke_icon_assets.py
+.\.venv\Scripts\python.exe tools\check_no_secrets.py
 ```
 
 Next 仓库的开发安全边界还要求：
 
 ```powershell
-.venv\Scripts\python.exe tools\v3_guard.py begin
+.\.venv\Scripts\python.exe tools\v3_guard.py begin
 # 修改/测试完成后
-.venv\Scripts\python.exe tools\v3_guard.py verify
+.\.venv\Scripts\python.exe tools\v3_guard.py verify
 ```
 
 父目录 `UtaSync` 是 v3 只读参考；不要在父目录运行格式化、安装、清理或提交命令。更多打包约束见 [`packaging/README.md`](../packaging/README.md)，运行入口见 [`run_next.ps1`](../run_next.ps1)。
