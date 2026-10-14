@@ -100,7 +100,13 @@ def main() -> int:
             return 1
         output_mode = "中日双语字幕" if args.translation_mode == "bilingual" else "纯中文字幕"
         if args.ass:
-            ass_preset = str(settings.get("ass_preset") or ass_preset)
+            configured_ass_preset = str(settings.get("ass_preset") or "").strip()
+            if configured_ass_preset and configured_ass_preset not in {"不生成", "不生成 (仅SRT)"}:
+                ass_preset = configured_ass_preset
+            else:
+                # The explicit smoke flag must exercise the ASS path even when
+                # the user's normal UI preference is SRT-only.
+                ass_preset = "默认双语 (纯白+浅灰)"
 
     payload = {
         "media_path": str(media_path),
