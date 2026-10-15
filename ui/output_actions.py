@@ -177,15 +177,36 @@ class OutputActionRunner:
         if not subtitles_dir.exists() and not log_dir.exists():
             return {}
 
+        # Do not build a glob from the media stem here.  Windows filenames can
+        # legally contain ``[`` and ``]`` (for example a downloaded video may
+        # end in ``[source-id]``), but ``Path.glob`` treats those characters as
+        # character-class syntax.  That made valid ASS/SRT outputs invisible to
+        # the UI even though the files existed on disk.
         srt_candidates = (
-            sorted(subtitles_dir.glob(f"{base_name}*.srt"), key=self._output_priority, reverse=True)
+            sorted(
+                (
+                    path
+                    for path in subtitles_dir.iterdir()
+                    if path.is_file() and path.name.startswith(base_name) and path.suffix.lower() == ".srt"
+                ),
+                key=self._output_priority,
+                reverse=True,
+            )
             if subtitles_dir.exists()
             else []
         )
         source_srt = subtitles_dir / f"{base_name}_极致打轴.srt"
         translated_candidates = [path for path in srt_candidates if path.resolve() != source_srt.resolve()]
         ass_candidates = (
-            sorted(subtitles_dir.glob(f"{base_name}*.ass"), key=self._output_priority, reverse=True)
+            sorted(
+                (
+                    path
+                    for path in subtitles_dir.iterdir()
+                    if path.is_file() and path.name.startswith(base_name) and path.suffix.lower() == ".ass"
+                ),
+                key=self._output_priority,
+                reverse=True,
+            )
             if subtitles_dir.exists()
             else []
         )
@@ -205,13 +226,17 @@ class OutputActionRunner:
             else []
         )
         video_candidates = sorted(
-            [
-                *output_root.glob(f"{base_name}*硬字幕成品*.mp4"),
-                *output_root.glob(f"{base_name}*硬字幕成品*.mkv"),
-            ],
+            (
+                path
+                for path in output_root.iterdir()
+                if path.is_file()
+                and path.name.startswith(base_name)
+                and "硬字幕成品" in path.stem
+                and path.suffix.lower() in {".mp4", ".mkv"}
+            ),
             key=lambda path: path.stat().st_mtime,
             reverse=True,
-        )
+        ) if output_root.exists() else []
         output_dir = output_root if video_candidates else subtitles_dir if subtitles_dir.exists() else log_dir
         artifacts: dict[str, str] = {
             "output_dir": str(output_dir.resolve()),
