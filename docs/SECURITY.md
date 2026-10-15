@@ -58,11 +58,11 @@ git grep -n -I -E "sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_|hf_[A-
 
 这不是密钥，但会暴露开发机的目录结构和一个个人文件夹名。如果你打算公开仓库，可以把这些字段统一替换成占位路径，数值结论不会受影响。默认不删改，等你决定。
 
-## 公开前需要你拍板的三件事
+## 公开前的发布决定
 
-1. **提交邮箱**：当前所有提交的作者和提交者都是 `zzzzzezzz <869768200@qq.com>`，公开后任何人都能看到。不想暴露的话，可以改成 noreply 地址再推；V3 的历史里已经用过 `53385348+zzzzzezzz@users.noreply.github.com`，可以直接沿用。
-2. **许可证**：仓库目前没有 `LICENSE`。想开放就给 MIT 或 Apache-2.0，只想私有备份就不加。
-3. **远端仓库位置**：GitHub、Gitee 还是自建 GitLab。Next 目前没有配置任何 remote。
+- 提交邮箱使用 GitHub noreply 地址 `53385348+zzzzzezzz@users.noreply.github.com`，避免公开真实邮箱；提交仍会关联到 `zzzzzezzz` 的 GitHub 账号。
+- 仓库使用 MIT License，允许使用、修改、再发布和商业使用，但分发时保留版权与许可证文本。
+- 目标远端是 GitHub，Next 作为独立仓库发布。
 
 ## 万一密钥已经泄漏
 
