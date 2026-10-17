@@ -119,6 +119,7 @@ def main() -> int:
     _run_script(results, "style-workbench-preview", ["tools/smoke_style_workbench_preview.py"])
     _run_script(results, "icon-assets", ["tools/smoke_icon_assets.py"])
     _run_script(results, "packaging-audit-policy", ["tools/smoke_packaging_audit.py"])
+    _run_script(results, "runtime-installer", ["tools/smoke_runtime_installer.py"])
     _run_script(results, "task-state", ["tools/smoke_task_state.py"])
     _run_script(results, "lyrics-context", ["tools/smoke_lyrics_context.py"])
     _run_script(results, "lyric-opening-gap", ["tools/smoke_lyric_gap_detection.py"])

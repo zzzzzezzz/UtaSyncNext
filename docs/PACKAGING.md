@@ -1,6 +1,6 @@
 # Launcher 打包
 
-UtaSyncNext 的 Launcher 是轻量 PyInstaller 包；`.engine`、`models_faster`、`.cache`、`fonts` 和 `output` 保持在包外。完整规则和资源说明见 [`packaging/README.md`](../packaging/README.md)。
+UtaSyncNext 的 Launcher 是轻量 PyInstaller 包；`.engine`、`models_faster`、`.cache`、`fonts` 和 `output` 保持在包外。完整规则和资源说明见 [`packaging/README.md`](../packaging/README.md)。打包版可通过“引擎与模型管理 → 安装/修复引擎”下载带校验的外置引擎，模型仍按用户选择单独下载。
 
 ## 构建前
 
@@ -51,5 +51,25 @@ Launcher 本身不是完整离线安装包；没有外置引擎或模型时，UI
    因为它们分别依赖本机引擎和未入库的 `fonts/`，这是预期结果，不是回归。
 5. 决定是否随仓库分发 `fonts/` 里的字体。思源黑体 CN/JP、霞鹜文楷、M PLUS 1p、Zen Kaku Gothic New
    都是 SIL OFL 许可，随仓库分发需要一并提供各自的许可文本；不分发则接受新克隆回退到 Windows 自带字体。
-6. 分发打包产物时用 `tools\package_launcher.ps1 -Clean`，并把 `.engine` 和 `models_faster` 作为外置依赖单独说明。
+6. 分发打包产物时用 `tools\package_launcher.ps1 -Clean`。若发布“到手即用”版本，额外上传经过瘦身的 `.engine` 分卷和 `utasync-engine-manifest.json`；模型仍作为首次启动后的按需下载项，不随包分发。
+
+## 引擎清单和首次安装
+
+引擎清单由 `engine/runtime_installer.py` 读取。最小格式如下：
+
+```json
+{
+  "version": "2026.10.17-cu121",
+  "assets": [
+    {
+      "name": "utasyncnext-engine-part1.zip",
+      "url": "https://example.invalid/utasyncnext-engine-part1.zip",
+      "size": 1234567890,
+      "sha256": "64 位十六进制 SHA256"
+    }
+  ]
+}
+```
+
+每个 ZIP 都必须解压出同一 `.engine` 目录的相对结构。安装器支持断点续传、逐文件 SHA256 校验、安全解压和失败回滚；发布前应先用临时清单和 `tools/smoke_runtime_installer.py` 验证。清单地址可由 `UTASYNCNEXT_ENGINE_MANIFEST_URL` 覆盖，便于使用 CDN 或私有对象存储。
 
