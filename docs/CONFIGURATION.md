@@ -66,7 +66,7 @@ worker 运行时还会设置 `UTASYNC_SITE_PACKAGES`、`UTASYNC_HOOKED_ENV`，�
 | `ch_size_override` / `jp_size_override` | `跟随预设` | 字号覆盖 |
 | `aspect_ratio` | `16:9 (常规宽屏/默认)` | 也支持自动侦测、1:1、4:3、9:16 |
 | `fade_mode` | `智能动态呼吸 (默认/推荐)` | 另有硬切和强制淡入淡出 |
-| `hires_export` | `false` | 高保真压制时输出 MKV；普通压制输出 MP4 |
+| `hires_export` | `false` | 开启后输出 MKV + FLAC 无损音频，关闭时输出 MP4 + AAC；视频画质两种模式相同，取舍见 `OUTPUT_FILES.md` 的“硬字幕成品”一节 |
 | `api_preset` / `api_provider` | `SiliconFlow (DeepSeek-V3)` / `SiliconFlow` | 仅作 UI 预设/来源记录 |
 | `api_url` | `https://api.siliconflow.cn/v1` | OpenAI-compatible Base URL |
 | `api_model` | `deepseek-ai/DeepSeek-V3` | 由用户选择的模型名会原样传给 API |
