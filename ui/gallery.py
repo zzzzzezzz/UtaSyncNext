@@ -49,6 +49,30 @@ FONT_PAIR_OPTIONS: dict[str, tuple[str, str]] = {
     "M PLUS + Zen Kaku（轻快日系）": ("M PLUS 1p", "Zen Kaku Gothic New"),
 }
 
+# A small local palette catalog keeps the style workflow predictable.  These
+# palettes change only the Chinese/Japanese colors and the shared outline;
+# fonts, sizes, and shadows remain the user's current choices.
+COLOR_PALETTES: dict[str, dict[str, str]] = {
+    "柔和统一": {
+        "ch_color": "#F0F8FF",
+        "jp_color": "#BAE6FD",
+        "outline": "#0C4A6E",
+        "description": "当前 yama 风格 · 同色系低对比",
+    },
+    "明显区分": {
+        "ch_color": "#FFF7ED",
+        "jp_color": "#7DD3FC",
+        "outline": "#0B1F3A",
+        "description": "推荐 · 中文暖白、日文天蓝",
+    },
+    "强对比": {
+        "ch_color": "#FFFFFF",
+        "jp_color": "#F59E0B",
+        "outline": "#111827",
+        "description": "复杂背景和现场画面",
+    },
+}
+
 # Short labels for the narrow preset cards; a full family name would be cut off.
 SHORT_FONT_NAMES: dict[str, str] = {
     "Source Han Sans CN": "思源CN",
@@ -668,6 +692,7 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         self.editor_toggle_btn.pack(side="right")
 
         self.editor_body = ctk.CTkFrame(self.editor_panel, fg_color="transparent")
+        self._build_palette_picker(self.editor_body)
         self._build_color_row(self.editor_body, "中文颜色", "ch_color")
         self._build_color_row(self.editor_body, "日文颜色", "jp_color")
         self._build_color_row(self.editor_body, "描边颜色", "ch_outline")
@@ -751,6 +776,100 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=9),
             text_color=UTASYNC_TOKENS.text_hint,
         ).pack(fill="x", padx=16)
+
+    def _build_palette_picker(self, parent: ctk.CTkFrame) -> None:
+        panel = ctk.CTkFrame(parent, fg_color="transparent")
+        panel.pack(fill="x", padx=16, pady=(4, 2))
+        header = ctk.CTkFrame(panel, fg_color="transparent")
+        header.pack(fill="x")
+        ctk.CTkLabel(
+            header,
+            text="中日配色",
+            anchor="w",
+            font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=10, weight="bold"),
+            text_color=UTASYNC_TOKENS.text_secondary,
+        ).pack(side="left")
+        ctk.CTkLabel(
+            header,
+            text="只改变颜色，先预览再保存",
+            anchor="e",
+            font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=9),
+            text_color=UTASYNC_TOKENS.text_hint,
+        ).pack(side="right")
+
+        row = ctk.CTkFrame(panel, fg_color="transparent")
+        row.pack(fill="x", pady=(5, 0))
+        self.palette_cards: dict[str, ctk.CTkFrame] = {}
+        for name, palette in COLOR_PALETTES.items():
+            card = ctk.CTkFrame(
+                row,
+                fg_color=UTASYNC_TOKENS.surface_control,
+                border_color=UTASYNC_TOKENS.border_subtle,
+                border_width=1,
+                corner_radius=8,
+                height=48,
+            )
+            card.pack(side="left", fill="x", expand=True, padx=(0, 5))
+            card.pack_propagate(False)
+            title = ctk.CTkLabel(
+                card,
+                text=name,
+                anchor="w",
+                font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=9, weight="bold"),
+                text_color=UTASYNC_TOKENS.text_secondary,
+            )
+            title.pack(fill="x", padx=8, pady=(6, 0))
+            swatches = ctk.CTkFrame(card, fg_color="transparent")
+            swatches.pack(fill="x", padx=8, pady=(3, 0))
+            for key in ("ch_color", "jp_color", "outline"):
+                swatch = ctk.CTkFrame(
+                    swatches,
+                    width=22,
+                    height=7,
+                    fg_color=palette[key],
+                    corner_radius=3,
+                )
+                swatch.pack(side="left", padx=(0, 3))
+                swatch.pack_propagate(False)
+            self.palette_cards[name] = card
+            self._bind_palette_card(card, name)
+        self._refresh_palette_cards()
+
+    def _bind_palette_card(self, widget: Any, name: str) -> None:
+        widget.bind("<Button-1>", lambda _event, value=name: self._select_color_palette(value))
+        for child in widget.winfo_children():
+            self._bind_palette_card(child, name)
+
+    def _refresh_palette_cards(self) -> None:
+        selected = getattr(self, "selected_palette_name", "")
+        for name, card in getattr(self, "palette_cards", {}).items():
+            active = name == selected
+            card.configure(
+                border_color=UTASYNC_TOKENS.accent_primary if active else UTASYNC_TOKENS.border_subtle,
+                fg_color=UTASYNC_TOKENS.surface_control_hover if active else UTASYNC_TOKENS.surface_control,
+            )
+
+    def _select_color_palette(self, name: str) -> None:
+        palette = COLOR_PALETTES.get(name)
+        if not palette:
+            return
+        self.selected_palette_name = name
+        for key, value in (
+            ("ch_color", palette["ch_color"]),
+            ("jp_color", palette["jp_color"]),
+            ("ch_outline", palette["outline"]),
+        ):
+            entry = getattr(self, f"{key}_entry")
+            entry.delete(0, "end")
+            entry.insert(0, value)
+            self._refresh_color_swatch(entry)
+        self._refresh_palette_cards()
+        config = dict(ASS_PRESETS.get(self.current_preset, {}))
+        config.update(self._read_manual_style())
+        self._render_preview(config)
+        self._request_ass_preview(config)
+        self.preview_badge.configure(text="未保存预览")
+        self.summary_state.configure(text="仅预览，尚未保存", text_color=UTASYNC_TOKENS.accent_warning)
 
     def _build_color_row(self, parent: ctk.CTkFrame, label: str, key: str) -> None:
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -867,14 +986,19 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         text_frame = ctk.CTkFrame(card, fg_color="transparent")
         text_frame.pack(side="left", fill="both", expand=True, pady=8)
         text_frame.bind("<Button-1>", select)
-        ctk.CTkLabel(
+        title_label = ctk.CTkLabel(
             text_frame,
             text=name,
             font=ctk.CTkFont(family=UTASYNC_TOKENS.font_ui, size=11, weight="bold"),
             text_color=UTASYNC_TOKENS.text_primary,
             justify="left",
             anchor="w",
-        ).pack(anchor="w")
+        )
+        title_label.pack(anchor="w")
+        # CTkLabel owns its own canvas, so clicks on the visible title do not
+        # bubble to the parent card. Bind it explicitly to keep the whole card
+        # equally responsive, including the text itself.
+        title_label.bind("<Button-1>", select)
         subtitle = self._preset_card_subtitle(config)
         subtitle_label = ctk.CTkLabel(
             text_frame,
@@ -886,6 +1010,7 @@ class StyleGalleryWindow(ctk.CTkToplevel):
         )
         subtitle_label.pack(anchor="w", pady=(2, 0))
         self._bind_card_subtitle(subtitle_label, subtitle)
+        subtitle_label.bind("<Button-1>", select)
         card.bind("<Button-1>", select)
         return card
 
@@ -1322,6 +1447,17 @@ class StyleGalleryWindow(ctk.CTkToplevel):
             entry.delete(0, "end")
             entry.insert(0, value)
             self._refresh_color_swatch(entry)
+        self.selected_palette_name = next(
+            (
+                name
+                for name, palette in COLOR_PALETTES.items()
+                if _safe_hex(config.get("ch_color"), "#FFFFFF") == palette["ch_color"]
+                and _safe_hex(config.get("jp_color"), "#CCCCCC") == palette["jp_color"]
+                and _safe_hex(config.get("ch_outline"), "#18181B") == palette["outline"]
+            ),
+            "",
+        )
+        self._refresh_palette_cards()
         self.ch_size_option.set(str(config.get("ch_size", 55)))
         self.jp_size_option.set(str(config.get("jp_size", 35)))
         self.outline_size_option.set(str(config.get("outline_size", 3)))
