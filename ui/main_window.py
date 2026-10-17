@@ -467,10 +467,11 @@ class MainWindow(DnDWindow):
                         )
                     )
                     self.workspace.update_outputs(self.last_outputs)
-                    self.append_log(f"✅ [硬字幕成品] {_display_path(output_video)}\n")
+                    self.append_log(f"✅ [硬字幕成品] {Path(output_video).resolve()}\n")
                     messagebox.showinfo(
                         "压制完成",
-                        f"硬字幕视频已生成：\n\n{Path(output_video).name}\n\n位置：{_display_path(Path(output_video).parent)}",
+                        f"硬字幕视频已生成：\n\n{Path(output_video).name}\n\n"
+                        f"完整路径：{Path(output_video).resolve()}",
                         parent=self,
                     )
 
