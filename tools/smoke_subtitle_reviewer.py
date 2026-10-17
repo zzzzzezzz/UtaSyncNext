@@ -73,12 +73,15 @@ def main() -> int:
                 _require(response.read() == b"first", "媒体 Range 内容错误")
 
             app_root_dir = root / "app"
-            media = root / "sample.mp4"
-            subtitle_dir = app_root_dir / "output" / "sample" / "subtitles"
+            # Keep punctuation that is legal in downloaded Windows filenames.
+            # Output discovery must treat the brackets as literal characters,
+            # rather than as glob character-class syntax.
+            media = root / "sample [source-id].mp4"
+            subtitle_dir = app_root_dir / "output" / media.stem / "subtitles"
             subtitle_dir.mkdir(parents=True)
             media.write_bytes(b"sample-media")
-            source = subtitle_dir / "sample_极致打轴.srt"
-            translated = subtitle_dir / "sample_极致打轴_双语字幕.srt"
+            source = subtitle_dir / f"{media.stem}_极致打轴.srt"
+            translated = subtitle_dir / f"{media.stem}_极致打轴_双语字幕.srt"
             source.write_text(_srt("原文"), encoding="utf-8")
             translated.write_text(_srt("原文\n译文"), encoding="utf-8")
 
