@@ -16,6 +16,7 @@ from engine.model_downloader import MODEL_SOURCES, SOURCE_OFFICIAL, ModelDownloa
 from engine.model_downloader import preflight_model_download
 from engine.model_registry import is_complete_snapshot, next_models_root, scan_models
 from engine.model_source_check import check_model_sources, format_source_check_report
+from engine.runtime_installer import EngineInstallError, fetch_manifest, install_engine, manifest_url
 from ui.engine_manager_support import (
     format_bytes,
     format_speed,
@@ -312,6 +313,54 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
             messagebox.showinfo("旧缓存目录", "未检测到用户目录下的 HuggingFace 缓存。", parent=manager)
             return
         os.startfile(user_hf_cache)
+
+    def install_runtime_engine() -> None:
+        if download_busy["value"] or action_busy["value"]:
+            messagebox.showinfo("正在忙碌", "已有下载或检查任务正在进行，请稍后再试。", parent=manager)
+            return
+        action = "修复/更新" if engine_ready else "安装"
+        if not messagebox.askyesno(
+            f"{action} Next 引擎",
+            "软件将从已配置的发布清单下载并校验外置 AI 引擎。\n\n"
+            "引擎可能占用数 GB 磁盘空间，下载完成后需要重启软件。\n"
+            f"下载清单：{manifest_url()}\n\n是否开始？",
+            parent=manager,
+        ):
+            return
+
+        download_busy["value"] = True
+        status_label.configure(text="正在读取引擎下载清单...")
+        download_progress.set(0)
+
+        def report(text: str, ratio: float) -> None:
+            safe_after(lambda: (status_label.configure(text=text), download_progress.set(ratio)))
+
+        def worker() -> None:
+            try:
+                manifest = fetch_manifest()
+                if manifest.total_size:
+                    report(f"已读取引擎清单：约 {format_bytes(manifest.total_size)}", 0.01)
+                install_engine(manifest, progress_cb=report)
+                safe_after(lambda: status_label.configure(text=f"引擎 {manifest.version} 安装完成，请重启软件"))
+                safe_after(
+                    lambda: messagebox.showinfo(
+                        "引擎安装完成",
+                        f"Next 引擎 {manifest.version} 已安装。请关闭并重新打开 UtaSyncNext 后再开始任务。",
+                        parent=manager,
+                    )
+                )
+            except EngineInstallError as exc:
+                error_text = str(exc)
+                safe_after(lambda: status_label.configure(text="引擎安装失败"))
+                safe_after(lambda text=error_text: messagebox.showerror("引擎安装失败", text, parent=manager))
+            except Exception as exc:
+                error_text = f"未知错误：{exc}"
+                safe_after(lambda: status_label.configure(text="引擎安装失败"))
+                safe_after(lambda text=error_text: messagebox.showerror("引擎安装失败", text, parent=manager))
+            finally:
+                download_busy["value"] = False
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def import_model() -> None:
         source = filedialog.askdirectory(
@@ -616,6 +665,14 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     ctk.CTkButton(action_row, text="GPU 升级指南", width=100, command=show_gpu_upgrade_guide, fg_color="#1F2937").pack(
         side="right", padx=(6, 0)
     )
+    ctk.CTkButton(
+        action_row,
+        text="安装/修复引擎",
+        width=110,
+        command=install_runtime_engine,
+        fg_color=ACCENT_GREEN if not engine_ready else "#1F2937",
+        text_color="#000000" if not engine_ready else TEXT_TITLE,
+    ).pack(side="right", padx=(6, 0))
     ctk.CTkButton(action_row, text="本机体检", width=84, command=run_health_check, fg_color="#1F2937").pack(
         side="right", padx=(6, 0)
     )
