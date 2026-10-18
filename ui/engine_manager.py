@@ -17,6 +17,7 @@ from engine.model_downloader import preflight_model_download
 from engine.model_registry import is_complete_snapshot, next_models_root, scan_models
 from engine.model_source_check import check_model_sources, format_source_check_report
 from engine.runtime_installer import EngineInstallError, fetch_manifest, install_engine, manifest_url
+from engine.status import inspect_engine_lightweight
 from ui.engine_manager_support import (
     format_bytes,
     format_speed,
@@ -30,6 +31,7 @@ from ui.engine_manager_support import (
 )
 from ui.theme import ACCENT_GREEN, BG_CARD, BG_WORKSPACE, TEXT_HINT, TEXT_MUTED, TEXT_TITLE
 from ui.window_icon import apply_child_window_icon
+from utils.ffmpeg_tools import ffmpeg_status_text, inspect_ffmpeg
 
 
 BORDER = "#2A2A2A"
@@ -358,10 +360,14 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         engine_probe_busy["value"] = True
         set_engine_resource_state("checking", "正在读取发布清单…")
         status_label.configure(text="正在检查引擎资源…")
+        # Read Tk state before entering the worker thread.  The same proxy
+        # entry is used by model downloads and should also cover the manifest
+        # probe, otherwise a configured local proxy is silently ignored here.
+        proxy_url = proxy_entry.get().strip()
 
         def worker() -> None:
             try:
-                manifest = fetch_manifest()
+                manifest = fetch_manifest(proxy_url=proxy_url)
                 size_text = f" · 总量约 {format_bytes(manifest.total_size)}" if manifest.total_size else ""
                 detail = f"清单 {manifest.version} 已读取{size_text}，可以安装或修复外置引擎。"
                 safe_after(lambda: set_engine_resource_state("available", detail))
@@ -508,6 +514,7 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
             check_engine_resources()
             return
         action = "修复/更新" if engine_ready else "安装"
+        proxy_url = proxy_entry.get().strip()
         if not messagebox.askyesno(
             f"{action} Next 引擎",
             "软件将从已配置的发布清单下载并校验外置 AI 引擎。\n\n"
@@ -526,10 +533,10 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
 
         def worker() -> None:
             try:
-                manifest = fetch_manifest()
+                manifest = fetch_manifest(proxy_url=proxy_url)
                 if manifest.total_size:
                     report(f"已读取引擎清单：约 {format_bytes(manifest.total_size)}", 0.01)
-                install_engine(manifest, progress_cb=report)
+                install_engine(manifest, progress_cb=report, proxy_url=proxy_url)
                 safe_after(lambda: status_label.configure(text=f"引擎 {manifest.version} 安装完成，请重启软件"))
                 safe_after(
                     lambda: messagebox.showinfo(
@@ -717,6 +724,33 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
 
         def worker() -> None:
             started = time.monotonic()
+            if getattr(sys, "frozen", False):
+                # The packaged launcher has no standalone Python interpreter
+                # or full tools/ tree.  Calling ``UtaSyncNext.exe tools/...``
+                # would relaunch the GUI, so use the same lightweight checks
+                # that the launcher and task preflight already trust.
+                engine_status = inspect_engine_lightweight()
+                ffmpeg_paths = inspect_ffmpeg()
+                ffmpeg_ready = all(ffmpeg_paths.get(name) for name in ("ffmpeg", "ffprobe"))
+                lines = [
+                    f"引擎：{engine_status.label}",
+                    engine_status.detail,
+                    f"FFmpeg：{ffmpeg_status_text(ffmpeg_paths)}",
+                ]
+                output = "\n".join(lines)
+                elapsed = time.monotonic() - started
+                passed = engine_status.ready and ffmpeg_ready
+                if passed:
+                    safe_after(lambda: download_progress.set(1))
+                    safe_after(lambda: status_label.configure(text=f"本机体检通过，用时 {elapsed:.1f}s"))
+                    safe_after(lambda: messagebox.showinfo("本机体检通过", output, parent=manager))
+                else:
+                    safe_after(lambda: download_progress.set(0))
+                    safe_after(lambda: status_label.configure(text="本机体检发现问题"))
+                    safe_after(lambda: messagebox.showerror("本机体检发现问题", output, parent=manager))
+                action_busy["value"] = False
+                return
+
             command = [
                 sys.executable,
                 "tools/verify_next_stack.py",
