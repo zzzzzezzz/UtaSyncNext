@@ -68,7 +68,7 @@ def _next_engine_candidates() -> list[tuple[Path, str, bool]]:
 def _inspect_candidate(root: Path, label: str, is_legacy: bool) -> EngineLocation:
     site_packages = _find_site_packages(root)
     scripts = root / "Scripts"
-    python = scripts / "python.exe"
+    python = _find_engine_python(root)
     if not site_packages:
         return EngineLocation(
             root=root if root.exists() else None,
@@ -90,6 +90,18 @@ def _inspect_candidate(root: Path, label: str, is_legacy: bool) -> EngineLocatio
         is_legacy=is_legacy,
         missing_modules=missing_modules,
     )
+
+
+def _find_engine_python(root: Path) -> Path:
+    """Prefer the portable release runtime, then legacy venv locations."""
+    for candidate in (
+        root / "python-runtime" / "python.exe",
+        root / "python.exe",
+        root / "Scripts" / "python.exe",
+    ):
+        if candidate.exists():
+            return candidate
+    return root / "Scripts" / "python.exe"
 
 
 def _find_site_packages(root: Path) -> Path | None:

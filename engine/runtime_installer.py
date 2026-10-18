@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 from typing import Callable
 
 from engine.cache_env import app_root
+from utils.network_proxy import build_urllib_opener
 
 
 DEFAULT_MANIFEST_URL = (
@@ -46,11 +47,11 @@ def manifest_url() -> str:
     return os.environ.get("UTASYNCNEXT_ENGINE_MANIFEST_URL", "").strip() or DEFAULT_MANIFEST_URL
 
 
-def fetch_manifest(url: str | None = None, timeout: int = 30) -> EngineManifest:
+def fetch_manifest(url: str | None = None, timeout: int = 30, proxy_url: str = "") -> EngineManifest:
     source_url = url or manifest_url()
     request = urllib.request.Request(source_url, headers={"User-Agent": "UtaSyncNext/engine-installer"})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with _open_url(request, timeout=timeout, proxy_url=proxy_url) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raise EngineInstallError(
@@ -92,6 +93,7 @@ def install_engine(
     manifest: EngineManifest,
     progress_cb: Callable[[str, float], None] | None = None,
     target_root: Path | None = None,
+    proxy_url: str = "",
 ) -> Path:
     """Download verified engine archives and atomically replace the local engine.
 
@@ -118,7 +120,16 @@ def install_engine(
         completed = 0
         for index, asset in enumerate(manifest.assets, start=1):
             archive = download_root / asset.name
-            _download_asset(asset, archive, progress_cb, completed, total, index, len(manifest.assets))
+            _download_asset(
+                asset,
+                archive,
+                progress_cb,
+                completed,
+                total,
+                index,
+                len(manifest.assets),
+                proxy_url=proxy_url,
+            )
             _verify_sha256(archive, asset.sha256)
             _extract_archive(archive, install_root)
             completed += asset.size or archive.stat().st_size
@@ -128,6 +139,11 @@ def install_engine(
 
         if not (install_root / "Scripts").exists() or not (install_root / "Lib" / "site-packages").exists():
             raise EngineInstallError("引擎包解压完成，但目录结构不完整。")
+        portable_root = install_root / "python-runtime"
+        if portable_root.exists() and not (
+            (portable_root / "python.exe").is_file() and (portable_root / "python._pth").is_file()
+        ):
+            raise EngineInstallError("引擎包包含便携 Python 目录，但运行时文件不完整。")
 
         if backup_root.exists():
             shutil.rmtree(backup_root)
@@ -157,6 +173,7 @@ def _download_asset(
     total: int | None,
     index: int,
     count: int,
+    proxy_url: str = "",
 ) -> None:
     if not _safe_asset_name(asset.name):
         raise EngineInstallError(f"引擎资产文件名无效：{asset.name}")
@@ -167,7 +184,7 @@ def _download_asset(
         headers["Range"] = f"bytes={existing}-"
     request = urllib.request.Request(asset.url, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with _open_url(request, timeout=60, proxy_url=proxy_url) as response:
             status = getattr(response, "status", None)
             if existing and status != 206:
                 existing = 0
@@ -189,6 +206,19 @@ def _download_asset(
         partial.replace(destination)
     except Exception as exc:
         raise EngineInstallError(f"下载引擎资产失败：{asset.name}：{exc}") from exc
+
+
+def _open_url(request: urllib.request.Request, *, timeout: int, proxy_url: str = ""):
+    """Open an installer URL with the user-selected proxy when supplied.
+
+    Keep the empty-proxy path on ``urllib.request.urlopen`` so existing system
+    proxy/environment behavior and lightweight tests remain unchanged.  A
+    non-empty value uses the same normalization rules as model downloads.
+    """
+    if not str(proxy_url or "").strip():
+        return urllib.request.urlopen(request, timeout=timeout)
+    opener = build_urllib_opener(proxy_url)
+    return opener.open(request, timeout=timeout)
 
 
 def _verify_sha256(path: Path, expected: str) -> None:
