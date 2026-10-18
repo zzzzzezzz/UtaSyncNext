@@ -447,7 +447,18 @@ class LiveSubtitleGenerator:
         engine_root = os.environ.get("UTASYNC_HOOKED_ENV", "").strip()
         candidates: list[Path] = []
         if engine_root:
-            candidates.append(Path(engine_root) / "Scripts" / "python.exe")
+            # Release engine parts include a small self-contained Python root
+            # with ``python._pth``.  Prefer it over the development venv
+            # redirector, whose original pyvenv.cfg may point at the builder's
+            # machine.  Keep the Scripts path as a compatibility fallback for
+            # older local engines.
+            candidates.extend(
+                [
+                    Path(engine_root) / "python-runtime" / "python.exe",
+                    Path(engine_root) / "python.exe",
+                    Path(engine_root) / "Scripts" / "python.exe",
+                ]
+            )
         candidates.append(Path(sys.executable))
 
         for candidate in candidates:
