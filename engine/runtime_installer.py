@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shutil
+import urllib.error
 import urllib.request
 import zipfile
 from dataclasses import dataclass
@@ -20,7 +21,9 @@ DEFAULT_MANIFEST_URL = (
 
 
 class EngineInstallError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,11 @@ def fetch_manifest(url: str | None = None, timeout: int = 30) -> EngineManifest:
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise EngineInstallError(
+            f"无法读取引擎下载清单：HTTP {exc.code} {exc.reason}",
+            status_code=exc.code,
+        ) from exc
     except Exception as exc:
         raise EngineInstallError(f"无法读取引擎下载清单：{exc}") from exc
 

@@ -196,10 +196,87 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     download_progress = ctk.CTkProgressBar(status_row, width=170, mode="determinate")
     download_progress.set(0)
     download_progress.pack(side="right", padx=(12, 0))
-    action_row = ctk.CTkFrame(footer, fg_color="transparent")
-    action_row.pack(fill="x")
+
+    engine_resource_row = ctk.CTkFrame(footer, fg_color="#0B0D12", border_color=BORDER, border_width=1, corner_radius=10)
+    engine_resource_row.pack(fill="x", pady=(0, 8))
+    engine_resource_indicator = ctk.CTkLabel(
+        engine_resource_row,
+        text="●",
+        width=18,
+        font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold"),
+        text_color=TEXT_HINT,
+    )
+    engine_resource_indicator.pack(side="left", padx=(12, 0), pady=8)
+    engine_resource_label = ctk.CTkLabel(
+        engine_resource_row,
+        text="正在检查引擎资源",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold"),
+        text_color=TEXT_TITLE,
+        anchor="w",
+    )
+    engine_resource_label.pack(side="left", padx=(4, 8), pady=8)
+    engine_resource_detail = ctk.CTkLabel(
+        engine_resource_row,
+        text="正在读取发布清单…",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+        text_color=TEXT_MUTED,
+        anchor="w",
+        justify="left",
+        wraplength=560,
+    )
+    engine_resource_detail.pack(side="left", fill="x", expand=True, padx=4, pady=8)
+    engine_resource_retry = ctk.CTkButton(
+        engine_resource_row,
+        text="重新检查",
+        width=88,
+        height=28,
+        command=lambda: check_engine_resources(),
+        fg_color="#1F2937",
+    )
+    engine_resource_retry.pack(side="right", padx=(8, 10), pady=5)
+
+    common_title = ctk.CTkLabel(
+        footer,
+        text="常用操作",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=11, weight="bold"),
+        text_color=TEXT_MUTED,
+        anchor="w",
+    )
+    common_title.pack(fill="x", pady=(0, 3))
+    common_row = ctk.CTkFrame(footer, fg_color="transparent")
+    common_row.pack(fill="x", pady=(0, 7))
+
+    check_title = ctk.CTkLabel(
+        footer,
+        text="检查与安装",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=11, weight="bold"),
+        text_color=TEXT_MUTED,
+        anchor="w",
+    )
+    check_title.pack(fill="x", pady=(0, 3))
+    check_row = ctk.CTkFrame(footer, fg_color="transparent")
+    check_row.pack(fill="x", pady=(0, 7))
+
+    more_expanded = {"value": False}
+    more_toggle = ctk.CTkButton(
+        footer,
+        text="更多工具  ▸",
+        width=150,
+        height=28,
+        anchor="w",
+        command=lambda: toggle_more_tools(),
+        fg_color="transparent",
+        hover_color="#1F2937",
+        text_color=TEXT_MUTED,
+    )
+    more_toggle.pack(anchor="w", pady=(0, 3))
+    more_row = ctk.CTkFrame(footer, fg_color="transparent")
+
     download_busy = {"value": False}
     action_busy = {"value": False}
+    engine_probe_busy = {"value": False}
+    engine_resource_state = {"kind": "checking", "detail": "正在读取发布清单…"}
+    engine_button_ref: dict[str, ctk.CTkButton | None] = {"button": None}
     manager_closed = threading.Event()
     active_monitor_stop: dict[str, threading.Event | None] = {"event": None}
 
@@ -224,6 +301,103 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
                 manager.after(0, lambda: safe_ui(callback))
         except (TclError, RuntimeError):
             pass
+
+    def set_engine_resource_state(kind: str, detail: str) -> None:
+        engine_resource_state["kind"] = kind
+        engine_resource_state["detail"] = detail
+        if kind == "available":
+            label = "引擎资源可用"
+            color = ACCENT_GREEN
+            button_text = "安装/修复引擎"
+            button_state = "normal"
+        elif kind == "unavailable":
+            label = "引擎资源未发布"
+            color = "#F59E0B"
+            button_text = "资源未发布"
+            button_state = "disabled"
+        elif kind == "error":
+            label = "暂时无法读取引擎资源"
+            color = "#F59E0B"
+            button_text = "重新检查资源"
+            button_state = "disabled"
+        else:
+            label = "正在检查引擎资源"
+            color = TEXT_HINT
+            button_text = "检查中…"
+            button_state = "disabled"
+
+        panel_border = {
+            "available": "#1B7A4A",
+            "unavailable": "#7A5A24",
+            "error": "#7A5A24",
+        }.get(kind, BORDER)
+        engine_resource_row.configure(border_color=panel_border)
+        engine_resource_indicator.configure(text_color=color)
+        engine_resource_label.configure(text=label, text_color=TEXT_TITLE)
+        engine_resource_detail.configure(text=detail)
+        engine_resource_retry.configure(
+            state="disabled" if kind == "checking" else "normal",
+            text="检查中…" if kind == "checking" else "重新检查",
+        )
+        button = engine_button_ref.get("button")
+        if button is not None:
+            button.configure(
+                text=button_text,
+                state=button_state,
+                fg_color=ACCENT_GREEN if kind == "available" else "#1F2937",
+                text_color="#000000" if kind == "available" else TEXT_HINT,
+            )
+
+    def check_engine_resources() -> None:
+        if engine_probe_busy["value"]:
+            return
+        if download_busy["value"] or action_busy["value"]:
+            messagebox.showinfo("正在忙碌", "已有下载或检查任务正在进行，请稍后再检查引擎资源。", parent=manager)
+            return
+
+        engine_probe_busy["value"] = True
+        set_engine_resource_state("checking", "正在读取发布清单…")
+        status_label.configure(text="正在检查引擎资源…")
+
+        def worker() -> None:
+            try:
+                manifest = fetch_manifest()
+                size_text = f" · 总量约 {format_bytes(manifest.total_size)}" if manifest.total_size else ""
+                detail = f"清单 {manifest.version} 已读取{size_text}，可以安装或修复外置引擎。"
+                safe_after(lambda: set_engine_resource_state("available", detail))
+                safe_after(lambda: status_label.configure(text="引擎资源检查完成"))
+            except EngineInstallError as exc:
+                error_text = str(exc)
+                status_code = getattr(exc, "status_code", None)
+                if status_code == 404 or "404" in error_text:
+                    detail = (
+                        "当前发布没有引擎清单（HTTP 404），本地已有引擎仍可继续使用；"
+                        "发布资源后可重新检查。"
+                    )
+                    safe_after(lambda: set_engine_resource_state("unavailable", detail))
+                    safe_after(lambda: status_label.configure(text="引擎资源尚未发布"))
+                else:
+                    detail = f"{error_text}。请检查网络或代理后重试。"
+                    safe_after(lambda: set_engine_resource_state("error", detail))
+                    safe_after(lambda: status_label.configure(text="引擎资源检查失败"))
+            except Exception as exc:
+                error_text = f"{exc}。请检查网络或代理后重试。"
+                safe_after(lambda: set_engine_resource_state("error", error_text))
+                safe_after(lambda: status_label.configure(text="引擎资源检查失败"))
+            finally:
+                engine_probe_busy["value"] = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def toggle_more_tools() -> None:
+        expanded = not more_expanded["value"]
+        more_expanded["value"] = expanded
+        if expanded:
+            more_row.pack(fill="x", pady=(0, 3))
+            more_toggle.configure(text="更多工具  ▾")
+        else:
+            more_row.pack_forget()
+            more_toggle.configure(text="更多工具  ▸")
 
     def close_manager() -> None:
         manager_closed.set()
@@ -318,6 +492,21 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         if download_busy["value"] or action_busy["value"]:
             messagebox.showinfo("正在忙碌", "已有下载或检查任务正在进行，请稍后再试。", parent=manager)
             return
+        resource_kind = engine_resource_state.get("kind")
+        if resource_kind == "checking":
+            messagebox.showinfo("正在检查", "正在确认引擎发布资源，请稍等片刻后再试。", parent=manager)
+            return
+        if resource_kind == "unavailable":
+            messagebox.showinfo(
+                "引擎资源未发布",
+                "当前版本的外置引擎清单尚未发布（HTTP 404）。\n\n"
+                "这不会影响已经安装的本地引擎；发布资源后点击“重新检查”即可。",
+                parent=manager,
+            )
+            return
+        if resource_kind != "available":
+            check_engine_resources()
+            return
         action = "修复/更新" if engine_ready else "安装"
         if not messagebox.askyesno(
             f"{action} Next 引擎",
@@ -351,8 +540,21 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
                 )
             except EngineInstallError as exc:
                 error_text = str(exc)
-                safe_after(lambda: status_label.configure(text="引擎安装失败"))
-                safe_after(lambda text=error_text: messagebox.showerror("引擎安装失败", text, parent=manager))
+                status_code = getattr(exc, "status_code", None)
+                if status_code == 404 or "404" in error_text:
+                    detail = "引擎资源尚未发布（HTTP 404），请稍后重新检查。"
+                    safe_after(lambda: set_engine_resource_state("unavailable", detail))
+                    safe_after(lambda: status_label.configure(text="引擎资源尚未发布"))
+                    safe_after(
+                        lambda: messagebox.showinfo(
+                            "引擎资源未发布",
+                            "当前发布没有可下载的引擎清单，软件没有改动现有引擎。",
+                            parent=manager,
+                        )
+                    )
+                else:
+                    safe_after(lambda: status_label.configure(text="引擎安装失败"))
+                    safe_after(lambda text=error_text: messagebox.showerror("引擎安装失败", text, parent=manager))
             except Exception as exc:
                 error_text = f"未知错误：{exc}"
                 safe_after(lambda: status_label.configure(text="引擎安装失败"))
@@ -662,40 +864,46 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
             side="right", padx=(8, 0)
         )
 
-    ctk.CTkButton(action_row, text="GPU 升级指南", width=100, command=show_gpu_upgrade_guide, fg_color="#1F2937").pack(
-        side="right", padx=(6, 0)
-    )
-    ctk.CTkButton(
-        action_row,
-        text="安装/修复引擎",
+    def add_action_button(
+        parent,
+        *,
+        text: str,
+        width: int,
+        command,
+        primary: bool = False,
+        state: str = "normal",
+    ) -> ctk.CTkButton:
+        button = ctk.CTkButton(
+            parent,
+            text=text,
+            width=width,
+            height=34,
+            command=command,
+            state=state,
+            fg_color=ACCENT_GREEN if primary else "#1F2937",
+            text_color="#000000" if primary else TEXT_TITLE,
+        )
+        button.pack(side="left", padx=(0, 6))
+        return button
+
+    add_action_button(common_row, text="导入本地模型", width=118, command=import_model, primary=True)
+    add_action_button(common_row, text="刷新", width=80, command=refresh)
+    add_action_button(common_row, text="打开模型目录", width=110, command=open_model_dir)
+    add_action_button(common_row, text="打开缓存目录", width=110, command=open_cache_dir)
+
+    add_action_button(check_row, text="模型源巡检", width=94, command=run_model_source_check)
+    add_action_button(check_row, text="本机体检", width=84, command=run_health_check)
+    engine_button = add_action_button(
+        check_row,
+        text="检查中…",
         width=110,
         command=install_runtime_engine,
-        fg_color=ACCENT_GREEN if not engine_ready else "#1F2937",
-        text_color="#000000" if not engine_ready else TEXT_TITLE,
-    ).pack(side="right", padx=(6, 0))
-    ctk.CTkButton(action_row, text="本机体检", width=84, command=run_health_check, fg_color="#1F2937").pack(
-        side="right", padx=(6, 0)
+        state="disabled",
     )
-    ctk.CTkButton(action_row, text="模型源巡检", width=94, command=run_model_source_check, fg_color="#1F2937").pack(
-        side="right", padx=(6, 0)
-    )
-    ctk.CTkButton(action_row, text="打开模型目录", width=110, command=open_model_dir, fg_color="#1F2937").pack(
-        side="right", padx=(6, 0)
-    )
-    ctk.CTkButton(action_row, text="打开缓存目录", width=110, command=open_cache_dir, fg_color="#1F2937").pack(
-        side="right", padx=(6, 0)
-    )
-    ctk.CTkButton(action_row, text="旧缓存位置", width=94, command=open_user_cache_dir, fg_color="#1F2937").pack(
-        side="right", padx=(6, 0)
-    )
-    ctk.CTkButton(action_row, text="刷新", width=80, command=refresh, fg_color="#1F2937").pack(side="right", padx=(6, 0))
-    ctk.CTkButton(
-        action_row,
-        text="导入本地模型",
-        width=118,
-        command=import_model,
-        fg_color=ACCENT_GREEN,
-        text_color="#000000",
-    ).pack(side="right", padx=(6, 0))
+    engine_button_ref["button"] = engine_button
+
+    add_action_button(more_row, text="旧缓存位置", width=94, command=open_user_cache_dir)
+    add_action_button(more_row, text="GPU 升级指南", width=100, command=show_gpu_upgrade_guide)
 
     refresh()
+    check_engine_resources()

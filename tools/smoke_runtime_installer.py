@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import tempfile
+import urllib.error
 import zipfile
 from pathlib import Path
 
@@ -12,7 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from engine.runtime_installer import fetch_manifest, install_engine
+import engine.runtime_installer as runtime_installer
+from engine.runtime_installer import EngineInstallError, fetch_manifest, install_engine
 
 
 def main() -> None:
@@ -53,6 +55,22 @@ def main() -> None:
                 os.environ.pop("UTASYNCNEXT_APP_ROOT", None)
             else:
                 os.environ["UTASYNCNEXT_APP_ROOT"] = previous_root
+
+    original_urlopen = runtime_installer.urllib.request.urlopen
+
+    def missing_manifest(*_args, **_kwargs):
+        raise urllib.error.HTTPError("https://example.invalid/manifest.json", 404, "Not Found", {}, None)
+
+    runtime_installer.urllib.request.urlopen = missing_manifest
+    try:
+        try:
+            fetch_manifest("https://example.invalid/manifest.json")
+        except EngineInstallError as exc:
+            assert exc.status_code == 404
+        else:
+            raise AssertionError("a missing manifest should preserve HTTP status 404")
+    finally:
+        runtime_installer.urllib.request.urlopen = original_urlopen
     print("PASS: runtime installer downloads, verifies, extracts, and installs a local manifest")
 
 

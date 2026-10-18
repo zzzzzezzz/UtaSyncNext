@@ -1,6 +1,6 @@
 # Launcher 打包
 
-UtaSyncNext 的 Launcher 是轻量 PyInstaller 包；`.engine`、`models_faster`、`.cache`、`fonts` 和 `output` 保持在包外。完整规则和资源说明见 [`packaging/README.md`](../packaging/README.md)。打包版可通过“引擎与模型管理 → 安装/修复引擎”下载带校验的外置引擎，模型仍按用户选择单独下载。
+UtaSyncNext 的 Launcher 是轻量 PyInstaller 包；`.engine`、`models_faster`、`.cache`、`fonts` 和 `output` 保持在包外。完整规则和资源说明见 [`packaging/README.md`](../packaging/README.md)。打包版可通过“引擎与模型管理 → 检查与安装 → 安装/修复引擎”下载带校验的外置引擎，模型仍按用户选择单独下载。模型管理器底部的操作按常用、检查与安装分区，旧缓存和 GPU 指南收在“更多工具”中；若发布端暂时没有清单，按钮会显示“引擎资源未发布”，不会把 404 当成安装崩溃。
 
 ## 构建前
 
