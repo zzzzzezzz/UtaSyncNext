@@ -91,9 +91,9 @@ UI 实际可选项和预设定义在 [`ui/sidebar_options.py`](../ui/sidebar_opt
 
 `https://github.com/zzzzzezzz/UtaSyncNext/releases/latest/download/utasyncnext-engine-manifest.json`
 
-打开窗口时会异步检查清单。若发布端返回 404，界面会显示“引擎资源未发布”，并停用安装按钮，不会弹出通用错误框，也不会改动已有 `.engine`；资源发布后点击“重新检查”即可恢复。网络或代理暂时不可用时同样可以重新检查。若本机已经有可用引擎，资源检查失败不会影响现有任务。
+打开窗口时会异步检查清单。正式发布包会在最新 Release 中同时提供清单和引擎分卷；如果仍返回 404，通常表示下载到了旧版本、Release 仍是草稿，或发布资产名称不匹配。界面会显示“引擎资源未发布”并停用安装按钮，不会改动已有 `.engine`；修正发布资产后点击“重新检查”即可恢复。网络或代理暂时不可用时同样可以重新检查。若本机已经有可用引擎，资源检查失败不会影响现有任务。
 
-如需切换到镜像或自建对象存储，可在启动前设置 `UTASYNCNEXT_ENGINE_MANIFEST_URL`。清单中的每个资产都必须是 ZIP，并包含 `Scripts/` 和 `Lib/site-packages/`；分卷资产可以分别托管，安装器会逐个校验后解压到同一个 `.engine`。安装完成后重启软件，再从模型管理器选择要使用的 Faster-Whisper 模型下载。
+如需切换到镜像或自建对象存储，可在启动前设置 `UTASYNCNEXT_ENGINE_MANIFEST_URL`。清单中的每个资产都必须是 ZIP，并包含同一个 `.engine` 的相对路径；正式分卷还包含 `python-runtime/` 便携 Python、`python._pth` 和修正后的 `pyvenv.cfg`，因此 Demucs 不依赖发布者电脑上的 Python 路径。安装器会逐个校验后解压到同一个 `.engine`。安装完成后重启软件，再从模型管理器选择要使用的 Faster-Whisper 模型下载。
 * 用户导入的 `.ttf`、`.otf`、`.ttc`、`.otc` 字体位于 `fonts/`，由压制时的 ASS/FFmpeg 使用；不扫描或安装整个 Windows 字体注册表。
 
 ## 不应提交的内容
