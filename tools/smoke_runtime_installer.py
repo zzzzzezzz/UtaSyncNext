@@ -44,19 +44,43 @@ def main() -> None:
         )
         previous_root = os.environ.get("UTASYNCNEXT_APP_ROOT")
         os.environ["UTASYNCNEXT_APP_ROOT"] = str(root)
+        original_urlopen = runtime_installer.urllib.request.urlopen
+
+        # The model manager's proxy field must also reach the engine manifest
+        # request.  Use a local file URI so the smoke stays offline while still
+        # exercising the explicit-opener path.
+        proxy_calls: list[str] = []
+        original_build_opener = runtime_installer.build_urllib_opener
+
+        class _ProxyForwardingOpener:
+            def open(self, request, timeout=0):
+                return original_urlopen(request, timeout=timeout)
+
+        def capture_proxy(value: str):
+            proxy_calls.append(value)
+            return _ProxyForwardingOpener()
+
         try:
             manifest = fetch_manifest(manifest_path.as_uri())
             install_engine(manifest)
             installed = root / ".engine"
             assert (installed / "Scripts" / "python.exe").read_bytes() == b"fake-python"
             assert (installed / "Lib" / "site-packages" / "faster_whisper" / "__init__.py").exists()
+            runtime_installer.build_urllib_opener = capture_proxy
+            proxied_manifest = fetch_manifest(manifest_path.as_uri(), proxy_url="10808")
+            assert proxied_manifest.version == "smoke"
+            proxy_target = root / ".engine.proxy"
+            install_engine(proxied_manifest, target_root=proxy_target, proxy_url="10808")
+            assert (proxy_target / "Scripts" / "python.exe").read_bytes() == b"fake-python"
+            # One opener is built for the manifest and one for the ZIP asset;
+            # both must receive the same user-entered proxy value.
+            assert proxy_calls == ["10808", "10808"]
         finally:
+            runtime_installer.build_urllib_opener = original_build_opener
             if previous_root is None:
                 os.environ.pop("UTASYNCNEXT_APP_ROOT", None)
             else:
                 os.environ["UTASYNCNEXT_APP_ROOT"] = previous_root
-
-    original_urlopen = runtime_installer.urllib.request.urlopen
 
     def missing_manifest(*_args, **_kwargs):
         raise urllib.error.HTTPError("https://example.invalid/manifest.json", 404, "Not Found", {}, None)
