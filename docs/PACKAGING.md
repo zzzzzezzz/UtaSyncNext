@@ -51,7 +51,7 @@ Launcher 本身不是完整离线安装包；没有外置引擎或模型时，UI
    因为它们分别依赖本机引擎和未入库的 `fonts/`，这是预期结果，不是回归。
 5. 决定是否随仓库分发 `fonts/` 里的字体。思源黑体 CN/JP、霞鹜文楷、M PLUS 1p、Zen Kaku Gothic New
    都是 SIL OFL 许可，随仓库分发需要一并提供各自的许可文本；不分发则接受新克隆回退到 Windows 自带字体。
-6. 分发打包产物时用 `tools\package_launcher.ps1 -Clean`。若发布“到手即用”版本，额外上传经过瘦身并带便携 Python 运行时的 `.engine` 分卷和 `utasyncnext-engine-manifest.json`；模型仍作为首次启动后的按需下载项，不随包分发。面向使用者的发布清单见 [`docs/DISTRIBUTION.md`](DISTRIBUTION.md)。
+6. 分发打包产物时用 `tools\package_launcher.ps1 -Clean`。发布“到手即用”版本时，把经过瘦身并带便携 Python 运行时的 `.engine` 分卷上传到 R2，把包含 R2 URL 的 `utasyncnext-engine-manifest.json` 和基础 ZIP 上传到 GitHub Release；模型仍作为首次启动后的按需下载项，不随包分发。面向使用者的发布清单见 [`docs/DISTRIBUTION.md`](DISTRIBUTION.md)。
 
 ## 引擎清单和首次安装
 

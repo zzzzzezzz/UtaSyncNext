@@ -1,20 +1,21 @@
 # 面向使用者的发布包
 
-UtaSyncNext 的 GitHub Release 分成两层：轻量启动器和首次运行时下载的外置引擎。启动器不会把 Torch、Demucs、Faster-Whisper 或 Whisper 模型塞进 EXE，因此下载速度和磁盘占用都更容易控制。
+UtaSyncNext 的发布包分成两层：GitHub 上的轻量启动器和首次运行时下载的外置引擎。启动器不会把 Torch、Demucs、Faster-Whisper 或 Whisper 模型塞进 EXE，因此下载速度和磁盘占用都更容易控制。引擎压缩包放在 Cloudflare R2 等对象存储，GitHub 只保存基础包和小型清单。
 
 ## v0.1.3 的文件
 
-发布页应同时包含这些文件：
+GitHub Release 应包含这些文件：
 
 - `UtaSyncNext-basic-v0.1.3.zip`：解压后即可启动的基础包。
 - `utasyncnext-engine-manifest.json`：安装器读取的 SHA256 清单。
-- `utasyncnext-engine-part-01.zip` 到 `utasyncnext-engine-part-03.zip`：外置 Next 引擎分卷。每卷小于 GitHub 的单资产限制，安装器会按清单下载、校验并合并到 `.engine`。
 
 清单地址固定为：
 
 `https://github.com/zzzzzezzz/UtaSyncNext/releases/latest/download/utasyncnext-engine-manifest.json`
 
-因此发布新版本时，清单和三个分卷必须和启动器放在同一个最新 Release。只上传基础 ZIP 而不上传清单，会再次出现 HTTP 404。
+清单中的 `assets[].url` 指向 R2 的公开 HTTPS 地址。发布新版本时，先把引擎分卷上传到 R2，再把带有 R2 地址和 SHA256 的清单上传到同一个最新 Release。只上传基础 ZIP 而不上传清单，会再次出现 HTTP 404。
+
+R2 桶默认是私有的。长期发布应绑定自定义域名；`r2.dev` 只适合测试，存在访问限制。当前引擎总量约 4.2 GB，低于 R2 Standard 每月 10 GB-month 的免费存储额度，但免费额度不是无限量，仍应在 Cloudflare 控制台监控存储和操作次数。
 
 ## 新电脑的使用顺序
 
@@ -36,9 +37,20 @@ UtaSyncNext 的 GitHub Release 分成两层：轻量启动器和首次运行时�
 .\.venv\Scripts\python.exe tools\build_engine_manifest.py `
   build\engine_release_v0.1.3 build\engine_release_v0.1.3\utasyncnext-engine-manifest.json `
   --version 0.1.3-cuda121-portable `
-  --base-url https://github.com/zzzzzezzz/UtaSyncNext/releases/download/v0.1.3
+  --base-url https://download.example.com/utasyncnext/v0.1.3
 .\.venv\Scripts\python.exe tools\smoke_engine_assets.py `
   build\engine_release_v0.1.3 --output build\engine_asset_verify_v0.1.3
 ```
 
 最后一个 smoke 会把所有分卷解压到临时应用目录，并从便携运行时导入 `torch`、`torchaudio`、`faster_whisper` 和 `demucs`。每个 ZIP 都必须小于 2 GiB；不要把 `.engine`、模型、缓存或用户设置提交到 Git。
+
+上传 R2 后，再用实际公开域名重新生成清单。例如：
+
+```powershell
+.\.venv\Scripts\python.exe tools\build_engine_manifest.py `
+  build\engine_release_v0.1.3 build\engine_release_v0.1.3\utasyncnext-engine-manifest.json `
+  --version 0.1.3-cuda121-portable `
+  --base-url https://download.example.com/utasyncnext/v0.1.3
+```
+
+发布前逐个用浏览器或 `Invoke-WebRequest` 检查 R2 URL 能返回 200/206，并核对清单中的 `size` 和 `sha256`。清单可以继续放 GitHub；安装器会从清单里的 R2 URL 下载，不要求 ZIP 也在 GitHub。
