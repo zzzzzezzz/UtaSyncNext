@@ -191,7 +191,10 @@ class MainWindow(DnDWindow):
             try:
                 log_path = app_root() / "output" / "engine_manager_error.log"
                 log_path.parent.mkdir(parents=True, exist_ok=True)
-                log_path.write_text("".join(traceback.format_exception(exc)), encoding="utf-8")
+                log_path.write_text(
+                    "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+                    encoding="utf-8",
+                )
             except Exception:
                 pass
             messagebox.showerror(
