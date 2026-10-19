@@ -4,6 +4,7 @@ import os
 import sys
 import threading
 import time
+import traceback
 from datetime import datetime
 from pathlib import Path
 from tkinter import PhotoImage, filedialog, messagebox
@@ -113,7 +114,7 @@ class MainWindow(DnDWindow):
             "show_help": lambda: show_help_dialog(self, getattr(self, "_icon_photo", None)),
             "import_video": self.import_media,
             "toggle_process": self.controller.toggle_task,
-            "open_manager": lambda: show_engine_manager(self, getattr(self, "_icon_photo", None), self.engine_status.ready),
+            "open_manager": self._open_engine_manager,
             "preview_ass": self.preview_ass_style,
             "redraw_ass": self.quick_redraw_ass,
             "burn_video": self.quick_burn_video,
@@ -181,6 +182,24 @@ class MainWindow(DnDWindow):
                 self._icon_photo = None
         for delay in (80, 280):
             self.after(delay, lambda: apply_dark_titlebar(self))
+
+    def _open_engine_manager(self) -> None:
+        """Open the manager without leaving an empty child window on failure."""
+        try:
+            show_engine_manager(self, getattr(self, "_icon_photo", None), self.engine_status.ready)
+        except Exception as exc:
+            try:
+                log_path = app_root() / "output" / "engine_manager_error.log"
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                log_path.write_text("".join(traceback.format_exception(exc)), encoding="utf-8")
+            except Exception:
+                pass
+            messagebox.showerror(
+                "引擎与模型管理打开失败",
+                "模型管理窗口初始化失败，详细信息已写入 output\\engine_manager_error.log。\n\n"
+                f"{exc}",
+                parent=self,
+            )
 
     def _record_ui_ready(self, launch_started_at: float) -> None:
         elapsed = max(0.0, time.perf_counter() - launch_started_at)

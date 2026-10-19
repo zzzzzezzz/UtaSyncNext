@@ -45,15 +45,64 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     manager.geometry("980x760")
     manager.minsize(900, 700)
     manager.configure(fg_color=BG_WORKSPACE)
+    # Build the fairly large manager off-screen first.  Showing the toplevel
+    # before all panels are created can leave a packaged Windows build looking
+    # like a blank black window while Tk is still laying out widgets.
+    manager.withdraw()
     manager.transient(parent)
     manager.grab_set()
     apply_child_window_icon(manager, parent)
 
-    model_root = next_models_root()
-    model_root.mkdir(parents=True, exist_ok=True)
-    cache_env = apply_next_cache_env()
-    hf_cache_root = huggingface_cache_root()
-    user_hf_cache = Path.home() / ".cache" / "huggingface"
+    try:
+        model_root = next_models_root()
+        model_root.mkdir(parents=True, exist_ok=True)
+        cache_env = apply_next_cache_env()
+        hf_cache_root = huggingface_cache_root()
+        user_hf_cache = Path.home() / ".cache" / "huggingface"
+    except Exception as exc:
+        # A packaged app can be extracted into a read-only or protected folder.
+        # Keep the child window usable and explain the real failure instead of
+        # leaving a blank black toplevel behind.
+        error_text = f"模型管理初始化失败：{exc}"
+        manager.configure(fg_color=BG_WORKSPACE)
+        error_frame = ctk.CTkFrame(manager, fg_color=BG_CARD, corner_radius=16)
+        error_frame.pack(fill="both", expand=True, padx=24, pady=24)
+        ctk.CTkLabel(
+            error_frame,
+            text="引擎与模型管理暂时无法打开",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=22, weight="bold"),
+            text_color=TEXT_TITLE,
+        ).pack(anchor="w", padx=24, pady=(28, 12))
+        ctk.CTkLabel(
+            error_frame,
+            text=(
+                "软件目录或缓存目录无法写入。请把软件解压到有写入权限的文件夹后重试。\n\n"
+                f"{error_text}\n\n"
+                "详细信息已写入 output\\engine_manager_error.log。"
+            ),
+            justify="left",
+            wraplength=760,
+            font=ctk.CTkFont(family="Microsoft YaHei", size=13),
+            text_color=TEXT_MUTED,
+        ).pack(anchor="w", fill="x", padx=24, pady=12)
+        ctk.CTkButton(
+            error_frame,
+            text="关闭",
+            command=close_manager if "close_manager" in locals() else manager.destroy,
+            fg_color=ACCENT_GREEN,
+            text_color="#000000",
+            width=100,
+        ).pack(anchor="e", padx=24, pady=(12, 24))
+        try:
+            log_path = app_root() / "output" / "engine_manager_error.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text(error_text, encoding="utf-8")
+        except Exception:
+            pass
+        manager.deiconify()
+        manager.lift()
+        manager.focus_force()
+        return
     user_cache_note = "旧 C 盘 HF 缓存：存在（Next 不依赖）" if user_hf_cache.exists() else "旧 C 盘 HF 缓存：未检测到"
     nearby_source_models = None
     if getattr(sys, "frozen", False):
@@ -941,3 +990,6 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
 
     refresh()
     check_engine_resources()
+    manager.deiconify()
+    manager.lift()
+    manager.focus_force()
