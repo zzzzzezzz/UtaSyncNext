@@ -17,6 +17,8 @@ GitHub Release 应包含这些文件：
 
 R2 桶默认是私有的。长期发布应绑定自定义域名；`r2.dev` 只适合测试，存在访问限制。当前引擎总量约 4.2 GB，低于 R2 Standard 每月 10 GB-month 的免费存储额度，但免费额度不是无限量，仍应在 Cloudflare 控制台监控存储和操作次数。
 
+v0.1.3 的 3 个分卷直接放在桶根目录，清单里也使用根路径 URL；重新生成清单时不要再加 `utasyncnext/v0.1.3` 前缀，否则下载会返回 404。新版本建议给 `tools\upload_r2_engine_assets.py --prefix utasyncnext/vX.Y.Z` 和 `tools\build_engine_manifest.py --base-url ...` 使用同一个前缀。
+
 ## 新电脑的使用顺序
 
 1. 下载并解压基础包，启动 `UtaSyncNext.exe`。
