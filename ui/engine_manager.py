@@ -106,7 +106,14 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     user_cache_note = "旧 C 盘 HF 缓存：存在（Next 不依赖）" if user_hf_cache.exists() else "旧 C 盘 HF 缓存：未检测到"
     nearby_source_models = None
     if getattr(sys, "frozen", False):
-        candidate = app_root().parents[1] / "models_faster"
+        # The portable package may be extracted directly under a drive root
+        # (for example ``E:\\UtaSyncNext-basic-v0.1.3-hotfix``).  Do not
+        # assume two parent levels exist just to look for an optional nearby
+        # legacy model directory.
+        package_root = app_root()
+        parents = package_root.parents
+        candidate_base = parents[1] if len(parents) > 1 else package_root.parent
+        candidate = candidate_base / "models_faster"
         try:
             if candidate.resolve() != model_root.resolve() and candidate.exists():
                 nearby_source_models = candidate
