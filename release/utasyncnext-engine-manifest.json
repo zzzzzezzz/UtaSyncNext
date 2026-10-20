@@ -1,0 +1,24 @@
+{
+  "version": "0.1.3-cuda121-portable",
+  "total_size": 4199909341,
+  "assets": [
+    {
+      "name": "utasyncnext-engine-part-01.zip",
+      "url": "https://pub-7d6a21a6d397461bac5e4f2d6e139314.r2.dev/utasyncnext-engine-part-01.zip",
+      "size": 1343671773,
+      "sha256": "b7f13469f14720b7136bc7c02505bcda2b8353627e6034bfb36c9f87ef31092c"
+    },
+    {
+      "name": "utasyncnext-engine-part-02.zip",
+      "url": "https://pub-7d6a21a6d397461bac5e4f2d6e139314.r2.dev/utasyncnext-engine-part-02.zip",
+      "size": 1590670530,
+      "sha256": "ac94efcd8282f9444839cfa7e15267a2e5f7d9bd9a5b4d381f067c8a16269eaf"
+    },
+    {
+      "name": "utasyncnext-engine-part-03.zip",
+      "url": "https://pub-7d6a21a6d397461bac5e4f2d6e139314.r2.dev/utasyncnext-engine-part-03.zip",
+      "size": 1265567038,
+      "sha256": "08d2024476c2c04b7374b8961ecf70894ceeead449e2537b3bab7a764eafe569"
+    }
+  ]
+}

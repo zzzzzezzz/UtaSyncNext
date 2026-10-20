@@ -19,6 +19,8 @@ R2 桶默认是私有的。长期发布应绑定自定义域名；`r2.dev` 只�
 
 v0.1.3 的 3 个分卷直接放在桶根目录，清单里也使用根路径 URL；重新生成清单时不要再加 `utasyncnext/v0.1.3` 前缀，否则下载会返回 404。新版本建议给 `tools\upload_r2_engine_assets.py --prefix utasyncnext/vX.Y.Z` 和 `tools\build_engine_manifest.py --base-url ...` 使用同一个前缀。
 
+`release/utasyncnext-engine-manifest.json` 保存的是 v0.1.3 实际生效的清单副本（919 bytes，SHA256 `857B63470A24A67EE5771D697AB54046E15D8FD51613C385DB8B56B5E54299F0`）。发新 Release 时如果引擎分卷没有变化，直接把这个文件作为附件上传即可；分卷重打包后必须重新生成清单并更新该副本。
+
 ## 新电脑的使用顺序
 
 1. 下载并解压基础包，启动 `UtaSyncNext.exe`。
