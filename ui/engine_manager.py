@@ -38,12 +38,14 @@ BORDER = "#2A2A2A"
 
 
 def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
+    local_engine_ready = {"value": engine_ready}
     manager = ctk.CTkToplevel(parent)
     manager.title("UtaSyncNext - 独立模型管理")
-    # Reserve enough room for the fixed settings panels and footer. The model
-    # list expands between them and remains the only vertically scrolling area.
-    manager.geometry("980x760")
-    manager.minsize(900, 700)
+    # The settings, model list, resource state, and actions share one scrollable
+    # surface. Only the compact progress line stays fixed, so every action
+    # remains reachable when Windows restores the manager at a short size.
+    manager.geometry("980x820")
+    manager.minsize(960, 620)
     manager.configure(fg_color=BG_WORKSPACE)
     # Build the fairly large manager off-screen first.  Showing the toplevel
     # before all panels are created can leave a packaged Windows build looking
@@ -132,16 +134,24 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         font=ctk.CTkFont(family="Microsoft YaHei", size=22, weight="bold"),
         text_color=TEXT_TITLE,
     ).pack(anchor="w")
-    ctk.CTkLabel(
+    local_engine_status_label = ctk.CTkLabel(
         header,
         text=(
-            f"引擎目录：{app_root() / '.engine'}（{'已检测到' if engine_ready else '未检测到'}）\n"
-            f"模型目录：{model_root}"
+            "本地引擎：已安装，可以使用" if local_engine_ready["value"]
+            else "本地引擎：未安装，需要先下载并安装引擎"
         ),
+        font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold"),
+        text_color=ACCENT_GREEN if local_engine_ready["value"] else "#F59E0B",
+        anchor="w",
+    )
+    local_engine_status_label.pack(anchor="w", pady=(6, 0))
+    ctk.CTkLabel(
+        header,
+        text=f"引擎目录：{app_root() / '.engine'}\n模型目录：{model_root}",
         font=ctk.CTkFont(family="Microsoft YaHei", size=12),
         text_color=TEXT_HINT,
         wraplength=680,
-    ).pack(anchor="w", pady=(6, 0))
+    ).pack(anchor="w", pady=(3, 0))
     ctk.CTkLabel(
         header,
         text=(
@@ -154,8 +164,17 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         wraplength=680,
     ).pack(anchor="w", pady=(4, 0))
 
-    cache_panel = ctk.CTkFrame(shell, fg_color="#0B0D12", border_color=BORDER, border_width=1, corner_radius=12)
-    cache_panel.pack(fill="x", padx=22, pady=(0, 12))
+    content = ctk.CTkScrollableFrame(
+        shell,
+        fg_color="transparent",
+        corner_radius=0,
+        scrollbar_button_color="#343434",
+        scrollbar_button_hover_color="#4A4A4A",
+    )
+    content.pack(fill="both", expand=True, padx=22, pady=(0, 8))
+
+    cache_panel = ctk.CTkFrame(content, fg_color="#0B0D12", border_color=BORDER, border_width=1, corner_radius=12)
+    cache_panel.pack(fill="x", pady=(0, 12))
     ctk.CTkLabel(
         cache_panel,
         text="缓存位置",
@@ -174,8 +193,8 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         justify="left",
     ).pack(side="left", fill="x", expand=True, padx=8, pady=10)
 
-    source_bar = ctk.CTkFrame(shell, fg_color="#0B0D12", border_color=BORDER, border_width=1, corner_radius=12)
-    source_bar.pack(fill="x", padx=22, pady=(0, 12))
+    source_bar = ctk.CTkFrame(content, fg_color="#0B0D12", border_color=BORDER, border_width=1, corner_radius=12)
+    source_bar.pack(fill="x", pady=(0, 12))
 
     source_var = ctk.StringVar(value=SOURCE_OFFICIAL)
     ctk.CTkLabel(
@@ -209,8 +228,8 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         text_color=TEXT_HINT,
     ).pack(side="left", padx=(8, 14), pady=12)
 
-    proxy_bar = ctk.CTkFrame(shell, fg_color="#0B0D12", border_color=BORDER, border_width=1, corner_radius=12)
-    proxy_bar.pack(fill="x", padx=22, pady=(0, 12))
+    proxy_bar = ctk.CTkFrame(content, fg_color="#0B0D12", border_color=BORDER, border_width=1, corner_radius=12)
+    proxy_bar.pack(fill="x", pady=(0, 12))
 
     ctk.CTkLabel(
         proxy_bar,
@@ -234,15 +253,32 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         text_color=TEXT_HINT,
     ).pack(side="left", padx=(8, 14), pady=12)
 
-    rows = ctk.CTkScrollableFrame(shell, fg_color="#090B0F", border_color=BORDER, border_width=1, corner_radius=12)
-    rows.pack(fill="both", expand=True, padx=22, pady=12)
+    models_title = ctk.CTkFrame(content, fg_color="transparent")
+    models_title.pack(fill="x", pady=(0, 6))
+    ctk.CTkLabel(
+        models_title,
+        text="模型状态",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold"),
+        text_color=TEXT_TITLE,
+        anchor="w",
+    ).pack(side="left")
+    ctk.CTkLabel(
+        models_title,
+        text="点击下载/修复可安装到上方模型目录",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+        text_color=TEXT_HINT,
+        anchor="w",
+    ).pack(side="left", padx=(10, 0))
 
+    rows = ctk.CTkFrame(content, fg_color="#090B0F", border_color=BORDER, border_width=1, corner_radius=12)
+    rows.pack(fill="x", pady=(0, 12))
+
+    # Keep the changing download text in a compact fixed strip. All actionable
+    # content above it scrolls, so this line cannot hide the manager controls.
     footer = ctk.CTkFrame(shell, fg_color="transparent")
-    footer.pack(fill="x", padx=22, pady=(0, 20))
-    # Keep the changing download text in its own row so a long status message
-    # can never squeeze the fixed action buttons next to it.
+    footer.pack(fill="x", padx=22, pady=(0, 14))
     status_row = ctk.CTkFrame(footer, fg_color="transparent")
-    status_row.pack(fill="x", pady=(0, 6))
+    status_row.pack(fill="x")
     status_label = ctk.CTkLabel(
         status_row,
         text="就绪",
@@ -255,24 +291,35 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     download_progress.set(0)
     download_progress.pack(side="right", padx=(12, 0))
 
-    engine_resource_row = ctk.CTkFrame(footer, fg_color="#0B0D12", border_color=BORDER, border_width=1, corner_radius=10)
+    engine_resource_row = ctk.CTkFrame(content, fg_color="#0B0D12", border_color=BORDER, border_width=1, corner_radius=10)
     engine_resource_row.pack(fill="x", pady=(0, 8))
+    engine_resource_header = ctk.CTkFrame(engine_resource_row, fg_color="transparent")
+    engine_resource_header.pack(fill="x", padx=10, pady=(8, 2))
     engine_resource_indicator = ctk.CTkLabel(
-        engine_resource_row,
+        engine_resource_header,
         text="●",
         width=18,
         font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold"),
         text_color=TEXT_HINT,
     )
-    engine_resource_indicator.pack(side="left", padx=(12, 0), pady=8)
+    engine_resource_indicator.pack(side="left")
     engine_resource_label = ctk.CTkLabel(
-        engine_resource_row,
-        text="正在检查引擎资源",
+        engine_resource_header,
+        text="在线安装资源：检查中",
         font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold"),
         text_color=TEXT_TITLE,
         anchor="w",
     )
-    engine_resource_label.pack(side="left", padx=(4, 8), pady=8)
+    engine_resource_label.pack(side="left", padx=(4, 8))
+    engine_resource_retry = ctk.CTkButton(
+        engine_resource_header,
+        text="重新检查",
+        width=88,
+        height=26,
+        command=lambda: check_engine_resources(),
+        fg_color="#1F2937",
+    )
+    engine_resource_retry.pack(side="right", padx=(8, 0))
     engine_resource_detail = ctk.CTkLabel(
         engine_resource_row,
         text="正在读取发布清单…",
@@ -280,44 +327,55 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         text_color=TEXT_MUTED,
         anchor="w",
         justify="left",
-        wraplength=560,
+        wraplength=720,
     )
-    engine_resource_detail.pack(side="left", fill="x", expand=True, padx=4, pady=8)
-    engine_resource_retry = ctk.CTkButton(
-        engine_resource_row,
-        text="重新检查",
-        width=88,
-        height=28,
-        command=lambda: check_engine_resources(),
+    engine_resource_detail.pack(fill="x", padx=(32, 10), pady=(2, 4))
+    engine_resource_actions = ctk.CTkFrame(engine_resource_row, fg_color="transparent")
+    engine_resource_actions.pack(fill="x", padx=10, pady=(0, 8))
+    ctk.CTkLabel(
+        engine_resource_actions,
+        text="安装完成后重启 UtaSyncNext 即可开始任务",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+        text_color=TEXT_HINT,
+        anchor="w",
+    ).pack(side="left", padx=(2, 8))
+    engine_primary_button = ctk.CTkButton(
+        engine_resource_actions,
+        text="检查中…",
+        width=132,
+        height=30,
+        command=lambda: install_runtime_engine(),
+        state="disabled",
         fg_color="#1F2937",
+        text_color=TEXT_HINT,
     )
-    engine_resource_retry.pack(side="right", padx=(8, 10), pady=5)
+    engine_primary_button.pack(side="right")
 
     common_title = ctk.CTkLabel(
-        footer,
+        content,
         text="常用操作",
         font=ctk.CTkFont(family="Microsoft YaHei", size=11, weight="bold"),
         text_color=TEXT_MUTED,
         anchor="w",
     )
     common_title.pack(fill="x", pady=(0, 3))
-    common_row = ctk.CTkFrame(footer, fg_color="transparent")
+    common_row = ctk.CTkFrame(content, fg_color="transparent")
     common_row.pack(fill="x", pady=(0, 7))
 
     check_title = ctk.CTkLabel(
-        footer,
+        content,
         text="检查与安装",
         font=ctk.CTkFont(family="Microsoft YaHei", size=11, weight="bold"),
         text_color=TEXT_MUTED,
         anchor="w",
     )
     check_title.pack(fill="x", pady=(0, 3))
-    check_row = ctk.CTkFrame(footer, fg_color="transparent")
+    check_row = ctk.CTkFrame(content, fg_color="transparent")
     check_row.pack(fill="x", pady=(0, 7))
 
     more_expanded = {"value": False}
     more_toggle = ctk.CTkButton(
-        footer,
+        content,
         text="更多工具  ▸",
         width=150,
         height=28,
@@ -328,7 +386,7 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         text_color=TEXT_MUTED,
     )
     more_toggle.pack(anchor="w", pady=(0, 3))
-    more_row = ctk.CTkFrame(footer, fg_color="transparent")
+    more_row = ctk.CTkFrame(content, fg_color="transparent")
 
     download_busy = {"value": False}
     action_busy = {"value": False}
@@ -364,22 +422,22 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         engine_resource_state["kind"] = kind
         engine_resource_state["detail"] = detail
         if kind == "available":
-            label = "引擎资源可用"
+            label = "在线安装资源：可用"
             color = ACCENT_GREEN
-            button_text = "安装/修复引擎"
+            button_text = "修复/更新引擎" if local_engine_ready["value"] else "安装 Next 引擎"
             button_state = "normal"
         elif kind == "unavailable":
-            label = "引擎资源未发布"
+            label = "在线安装资源：未发布"
             color = "#F59E0B"
             button_text = "资源未发布"
             button_state = "disabled"
         elif kind == "error":
-            label = "暂时无法读取引擎资源"
+            label = "在线安装资源：读取失败"
             color = "#F59E0B"
             button_text = "重新检查资源"
             button_state = "disabled"
         else:
-            label = "正在检查引擎资源"
+            label = "在线安装资源：检查中"
             color = TEXT_HINT
             button_text = "检查中…"
             button_state = "disabled"
@@ -569,7 +627,7 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
         if resource_kind != "available":
             check_engine_resources()
             return
-        action = "修复/更新" if engine_ready else "安装"
+        action = "修复/更新" if local_engine_ready["value"] else "安装"
         proxy_url = proxy_entry.get().strip()
         if not messagebox.askyesno(
             f"{action} Next 引擎",
@@ -593,6 +651,16 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
                 if manifest.total_size:
                     report(f"已读取引擎清单：约 {format_bytes(manifest.total_size)}", 0.01)
                 install_engine(manifest, progress_cb=report, proxy_url=proxy_url)
+                local_engine_ready["value"] = True
+                safe_after(
+                    lambda: (
+                        local_engine_status_label.configure(
+                            text="本地引擎：已安装，重启软件后生效",
+                            text_color=ACCENT_GREEN,
+                        ),
+                        engine_primary_button.configure(text="修复/更新引擎"),
+                    )
+                )
                 safe_after(lambda: status_label.configure(text=f"引擎 {manifest.version} 安装完成，请重启软件"))
                 safe_after(
                     lambda: messagebox.showinfo(
@@ -983,14 +1051,7 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
 
     add_action_button(check_row, text="模型源巡检", width=94, command=run_model_source_check)
     add_action_button(check_row, text="本机体检", width=84, command=run_health_check)
-    engine_button = add_action_button(
-        check_row,
-        text="检查中…",
-        width=110,
-        command=install_runtime_engine,
-        state="disabled",
-    )
-    engine_button_ref["button"] = engine_button
+    engine_button_ref["button"] = engine_primary_button
 
     add_action_button(more_row, text="旧缓存位置", width=94, command=open_user_cache_dir)
     add_action_button(more_row, text="GPU 升级指南", width=100, command=show_gpu_upgrade_guide)
