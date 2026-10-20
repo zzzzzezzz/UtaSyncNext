@@ -49,6 +49,10 @@ def main() -> None:
         # A packaged/secondary launch can otherwise leave the Tk window behind
         # the terminal or the host app even though the process is healthy.
         app.after(180, _show_main_window)
+        if os.environ.get("UTASYNCNEXT_OPEN_MANAGER_SMOKE") == "1":
+            # Package probes use this to exercise the real manager import and
+            # window-creation path without driving synthetic mouse events.
+            app.after(900, app._open_engine_manager)
         app.mainloop()
     finally:
         instance_lock.release()

@@ -1,6 +1,6 @@
 # Launcher 打包
 
-UtaSyncNext 的 Launcher 是轻量 PyInstaller 包；`.engine`、`models_faster`、`.cache`、`fonts` 和 `output` 保持在包外。完整规则和资源说明见 [`packaging/README.md`](../packaging/README.md)。打包版可通过“引擎与模型管理 → 检查与安装 → 安装/修复引擎”下载带校验的外置引擎，模型仍按用户选择单独下载。模型管理器底部的操作按常用、检查与安装分区，旧缓存和 GPU 指南收在“更多工具”中；若发布端暂时没有清单，按钮会显示“引擎资源未发布”，不会把 404 当成安装崩溃。
+UtaSyncNext 的 Launcher 是轻量 PyInstaller 包；`.engine`、`models_faster`、`.cache`、`fonts` 和 `output` 保持在包外。完整规则和资源说明见 [`packaging/README.md`](../packaging/README.md)。打包版可在“引擎与模型管理 → 在线安装资源”直接下载带校验的外置引擎，模型仍按用户选择单独下载。管理器会分别显示本地引擎状态和在线资源状态；模型列表、安装入口和常用操作位于同一滚动区，短窗口也不会裁掉按钮。若发布端暂时没有清单，按钮会显示“资源未发布”，不会把 404 当成安装崩溃。
 
 ## 构建前
 
@@ -34,9 +34,10 @@ powershell -ExecutionPolicy Bypass -File tools\link_dist_runtime.ps1
 
    ```powershell
    .\.venv\Scripts\python.exe tools\probe_launcher_close.py
+   .\.venv\Scripts\python.exe tools\probe_packaged_engine_manager.py
    ```
 
-   这个探针只对标题为 `UtaSyncNext` 的窗口发 `WM_CLOSE`。不要用读 `Process.MainWindowHandle` 的 PowerShell 脚本代替：Windows 11 上进程第一个可见顶层窗口常常是 `UAC_InputIndicatorOverlayWnd` 浮层，`CloseMainWindow()` 会打到那个窗口，于是会报出一个应用本身没有的“关不掉”结论。
+   第一个探针验证主窗口能启动和关闭；第二个探针通过仅在测试时启用的环境变量打开真实的打包版模型管理器，确认管理器窗口出现后再关闭应用。不要用读 `Process.MainWindowHandle` 的 PowerShell 脚本代替：Windows 11 上进程第一个可见顶层窗口常常是 `UAC_InputIndicatorOverlayWnd` 浮层，`CloseMainWindow()` 会打到那个窗口，于是会报出一个应用本身没有的“关不掉”结论。
 
 Launcher 本身不是完整离线安装包；没有外置引擎或模型时，UI 可以打开，但任务预检会明确提示缺少依赖。
 
