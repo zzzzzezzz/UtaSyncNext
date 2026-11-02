@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Callable
 
 from engine.cache_env import app_root
+from engine.locator import find_engine_location
 from utils.network_proxy import build_urllib_opener
 
 
@@ -133,16 +134,13 @@ def resolve_required_weights(model_name: str = DEFAULT_MODEL) -> list[tuple[str,
 
 
 def find_demucs_remote_dir() -> Path:
+    # Use the same engine selection as the pipeline worker.  In particular,
+    # UTASYNCNEXT_ENGINE_ROOT may point outside the application directory.
+    location = find_engine_location()
+    candidates = [location.site_packages / "demucs" / "remote"] if location.site_packages else []
     site_packages = os.environ.get("UTASYNC_SITE_PACKAGES", "").strip()
-    candidates = []
     if site_packages:
         candidates.append(Path(site_packages) / "demucs" / "remote")
-    candidates.extend(
-        [
-            app_root() / ".engine" / "Lib" / "site-packages" / "demucs" / "remote",
-            app_root() / ".venv" / "Lib" / "site-packages" / "demucs" / "remote",
-        ]
-    )
     for candidate in candidates:
         if candidate.exists():
             return candidate
