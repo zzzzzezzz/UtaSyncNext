@@ -12,6 +12,12 @@ from tkinter import TclError, filedialog, messagebox
 import customtkinter as ctk
 
 from engine.cache_env import app_root, apply_next_cache_env, huggingface_cache_root
+from engine.demucs_weights import (
+    DemucsWeightsError,
+    DemucsWeightsStatus,
+    download_demucs_weights,
+    inspect_demucs_weights,
+)
 from engine.model_downloader import MODEL_SOURCES, SOURCE_OFFICIAL, ModelDownloadError, download_model
 from engine.model_downloader import preflight_model_download
 from engine.model_registry import is_complete_snapshot, next_models_root, scan_models
@@ -35,6 +41,17 @@ from utils.ffmpeg_tools import ffmpeg_status_text, inspect_ffmpeg
 
 
 BORDER = "#2A2A2A"
+
+
+def _demucs_health_text(status: DemucsWeightsStatus) -> str:
+    if status.ready:
+        return f"Demucs 人声分离：已就绪（{len(status.required_files)} 个权重文件）"
+    if status.required_files:
+        return (
+            f"Demucs 人声分离：缺少 {len(status.missing_files)} 个权重文件。"
+            "唱歌视频启用人声分离前，请在模型管理器点击“下载/准备权重”。"
+        )
+    return f"Demucs 人声分离：无法检查（{status.detail}）"
 
 
 def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
@@ -351,6 +368,73 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     )
     engine_primary_button.pack(side="right")
 
+    demucs_resource_row = ctk.CTkFrame(
+        content,
+        fg_color="#0B0D12",
+        border_color=BORDER,
+        border_width=1,
+        corner_radius=10,
+    )
+    demucs_resource_row.pack(fill="x", pady=(0, 8))
+    demucs_resource_header = ctk.CTkFrame(demucs_resource_row, fg_color="transparent")
+    demucs_resource_header.pack(fill="x", padx=10, pady=(8, 2))
+    demucs_resource_indicator = ctk.CTkLabel(
+        demucs_resource_header,
+        text="●",
+        width=18,
+        font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold"),
+        text_color=TEXT_HINT,
+    )
+    demucs_resource_indicator.pack(side="left")
+    demucs_resource_label = ctk.CTkLabel(
+        demucs_resource_header,
+        text="人声分离权重：检查中",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold"),
+        text_color=TEXT_TITLE,
+        anchor="w",
+    )
+    demucs_resource_label.pack(side="left", padx=(4, 8))
+    demucs_resource_refresh = ctk.CTkButton(
+        demucs_resource_header,
+        text="重新检查",
+        width=88,
+        height=26,
+        command=lambda: refresh_demucs_status(),
+        fg_color="#1F2937",
+    )
+    demucs_resource_refresh.pack(side="right", padx=(8, 0))
+    demucs_resource_detail = ctk.CTkLabel(
+        demucs_resource_row,
+        text="正在检查 htdemucs_ft 权重…",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+        text_color=TEXT_MUTED,
+        anchor="w",
+        justify="left",
+        wraplength=720,
+    )
+    demucs_resource_detail.pack(fill="x", padx=(32, 10), pady=(2, 4))
+    demucs_resource_actions = ctk.CTkFrame(demucs_resource_row, fg_color="transparent")
+    demucs_resource_actions.pack(fill="x", padx=10, pady=(0, 8))
+    demucs_resource_hint = ctk.CTkLabel(
+        demucs_resource_actions,
+        text="唱歌视频启用 Demucs 前需要准备；访谈可跳过。",
+        font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+        text_color=TEXT_HINT,
+        anchor="w",
+    )
+    demucs_resource_hint.pack(side="left", padx=(2, 8))
+    demucs_primary_button = ctk.CTkButton(
+        demucs_resource_actions,
+        text="检查中…",
+        width=150,
+        height=30,
+        command=lambda: prepare_demucs_weights(),
+        state="disabled",
+        fg_color="#1F2937",
+        text_color=TEXT_HINT,
+    )
+    demucs_primary_button.pack(side="right")
+
     common_title = ctk.CTkLabel(
         content,
         text="常用操作",
@@ -391,6 +475,9 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     download_busy = {"value": False}
     action_busy = {"value": False}
     engine_probe_busy = {"value": False}
+    demucs_status: dict[str, DemucsWeightsStatus | None] = {"value": None}
+    demucs_busy = {"value": False}
+    demucs_probe_busy = {"value": False}
     engine_resource_state = {"kind": "checking", "detail": "正在读取发布清单…"}
     engine_button_ref: dict[str, ctk.CTkButton | None] = {"button": None}
     manager_closed = threading.Event()
@@ -506,6 +593,140 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
                 safe_after(lambda: status_label.configure(text="引擎资源检查失败"))
             finally:
                 engine_probe_busy["value"] = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def set_demucs_status(status: DemucsWeightsStatus | None, *, checking: bool = False) -> None:
+        demucs_status["value"] = status
+        if checking:
+            label = "人声分离权重：检查中"
+            color = TEXT_HINT
+            border = BORDER
+            detail = "正在检查 htdemucs_ft 权重…"
+            button_text = "检查中…"
+            button_state = "disabled"
+        elif not local_engine_ready["value"]:
+            label = "人声分离权重：需先安装引擎"
+            color = "#F59E0B"
+            border = "#7A5A24"
+            detail = "Demucs 程序随 Next 引擎安装；安装引擎后才能准备唱歌视频所需的人声分离权重。"
+            button_text = "先安装引擎"
+            button_state = "disabled"
+        elif status is None or not status.required_files:
+            label = "人声分离权重：无法检查"
+            color = "#F59E0B"
+            border = "#7A5A24"
+            detail = (status.detail if status and status.detail else "未找到 Demucs 模型清单，请先检查引擎目录。")
+            button_text = "重新检查"
+            button_state = "normal"
+        elif status.ready:
+            label = "人声分离权重：已就绪"
+            color = ACCENT_GREEN
+            border = "#1B7A4A"
+            detail = f"{status.model_name} 的 {len(status.required_files)} 个权重文件已在本机准备好，可以启用 Demucs。"
+            button_text = "已就绪"
+            button_state = "disabled"
+        else:
+            label = "人声分离权重：未准备"
+            color = "#F59E0B"
+            border = "#7A5A24"
+            detail = (
+                f"缺少或损坏 {len(status.missing_files)}/{len(status.required_files)} 个文件；"
+                f"下载后唱歌视频才能启用人声分离。保存位置：{status.checkpoints_dir}"
+            )
+            button_text = "下载/准备权重"
+            button_state = "normal"
+
+        demucs_resource_row.configure(border_color=border)
+        demucs_resource_indicator.configure(text_color=color)
+        demucs_resource_label.configure(text=label, text_color=TEXT_TITLE)
+        demucs_resource_detail.configure(text=detail)
+        demucs_resource_refresh.configure(state="disabled" if checking else "normal")
+        demucs_primary_button.configure(
+            text=button_text,
+            state=button_state,
+            fg_color=ACCENT_GREEN if button_state == "normal" else "#1F2937",
+            text_color="#000000" if button_state == "normal" else TEXT_HINT,
+        )
+
+    def refresh_demucs_status() -> None:
+        if demucs_probe_busy["value"] or demucs_busy["value"]:
+            return
+        demucs_probe_busy["value"] = True
+        set_demucs_status(None, checking=True)
+
+        def worker() -> None:
+            try:
+                status = inspect_demucs_weights()
+                safe_after(lambda: set_demucs_status(status))
+            except Exception as exc:
+                safe_after(lambda: set_demucs_status(DemucsWeightsStatus("htdemucs_ft", Path(), (), (), str(exc))))
+            finally:
+                demucs_probe_busy["value"] = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def prepare_demucs_weights() -> None:
+        if not local_engine_ready["value"]:
+            messagebox.showinfo("需要先安装引擎", "请先完成 Next 引擎安装，再准备 Demucs 人声分离权重。", parent=manager)
+            return
+        if download_busy["value"] or action_busy["value"] or demucs_busy["value"]:
+            messagebox.showinfo("正在忙碌", "已有下载或检查任务正在进行，请稍后再试。", parent=manager)
+            return
+        current = demucs_status.get("value")
+        if current is None or not current.required_files:
+            refresh_demucs_status()
+            return
+        if current.ready:
+            return
+
+        proxy_url = proxy_entry.get().strip()
+        if not messagebox.askyesno(
+            "准备 Demucs 人声分离",
+            "将下载 htdemucs_ft 的人声分离权重到当前软件的缓存目录。\n\n"
+            "唱歌视频启用 Demucs 前需要完成这一步；下载中断后可以再次点击继续。\n"
+            f"代理：{proxy_url or '系统/环境默认网络'}\n\n是否开始？",
+            parent=manager,
+        ):
+            return
+
+        demucs_busy["value"] = True
+        download_busy["value"] = True
+        demucs_primary_button.configure(text="下载中…", state="disabled")
+        status_label.configure(text="正在准备 Demucs 人声分离权重…")
+        download_progress.set(0)
+
+        def report(text: str, ratio: float) -> None:
+            safe_after(lambda: (status_label.configure(text=text), download_progress.set(ratio)))
+
+        def worker() -> None:
+            try:
+                status = download_demucs_weights(proxy_url=proxy_url, progress_cb=report)
+                safe_after(lambda: set_demucs_status(status))
+                safe_after(lambda: download_progress.set(1))
+                safe_after(lambda: status_label.configure(text="Demucs 人声分离权重已准备完成"))
+                safe_after(
+                    lambda: messagebox.showinfo(
+                        "人声分离已准备",
+                        "Demucs 人声分离权重已下载完成。以后处理唱歌视频时可以开启 Demucs。",
+                        parent=manager,
+                    )
+                )
+            except DemucsWeightsError as exc:
+                error_text = str(exc)
+                failed_status = inspect_demucs_weights()
+                safe_after(lambda: set_demucs_status(failed_status))
+                safe_after(lambda: status_label.configure(text="Demucs 权重准备失败"))
+                safe_after(lambda text=error_text: messagebox.showerror("Demucs 权重准备失败", text, parent=manager))
+            except Exception as exc:
+                error_text = f"未知错误：{exc}"
+                failed_status = inspect_demucs_weights()
+                safe_after(lambda: set_demucs_status(failed_status))
+                safe_after(lambda: status_label.configure(text="Demucs 权重准备失败"))
+                safe_after(lambda text=error_text: messagebox.showerror("Demucs 权重准备失败", text, parent=manager))
+            finally:
+                demucs_busy["value"] = False
+                download_busy["value"] = False
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -661,6 +882,7 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
                         engine_primary_button.configure(text="修复/更新引擎"),
                     )
                 )
+                safe_after(refresh_demucs_status)
                 safe_after(lambda: status_label.configure(text=f"引擎 {manifest.version} 安装完成，请重启软件"))
                 safe_after(
                     lambda: messagebox.showinfo(
@@ -861,13 +1083,20 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
                     engine_status.detail,
                     f"FFmpeg：{ffmpeg_status_text(ffmpeg_paths)}",
                 ]
+                weights = inspect_demucs_weights()
+                lines.append(_demucs_health_text(weights))
                 output = "\n".join(lines)
                 elapsed = time.monotonic() - started
                 passed = engine_status.ready and ffmpeg_ready
-                if passed:
+                safe_after(lambda: set_demucs_status(weights))
+                if passed and weights.ready:
                     safe_after(lambda: download_progress.set(1))
                     safe_after(lambda: status_label.configure(text=f"本机体检通过，用时 {elapsed:.1f}s"))
                     safe_after(lambda: messagebox.showinfo("本机体检通过", output, parent=manager))
+                elif passed:
+                    safe_after(lambda: download_progress.set(1))
+                    safe_after(lambda: status_label.configure(text="本机体检：Demucs 权重待准备"))
+                    safe_after(lambda: messagebox.showwarning("人声分离尚未准备", output, parent=manager))
                 else:
                     safe_after(lambda: download_progress.set(0))
                     safe_after(lambda: status_label.configure(text="本机体检发现问题"))
@@ -896,10 +1125,17 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
                 )
                 elapsed = time.monotonic() - started
                 output = tail_text(completed.stdout, 1800)
-                if completed.returncode == 0:
+                weights = inspect_demucs_weights()
+                output = f"{output}\n{_demucs_health_text(weights)}".strip()
+                safe_after(lambda: set_demucs_status(weights))
+                if completed.returncode == 0 and weights.ready:
                     safe_after(lambda: download_progress.set(1))
                     safe_after(lambda: status_label.configure(text=f"本机体检通过，用时 {elapsed:.1f}s"))
                     safe_after(lambda: messagebox.showinfo("本机体检通过", output or "health profile passed.", parent=manager))
+                elif completed.returncode == 0:
+                    safe_after(lambda: download_progress.set(1))
+                    safe_after(lambda: status_label.configure(text="本机体检：Demucs 权重待准备"))
+                    safe_after(lambda: messagebox.showwarning("人声分离尚未准备", output, parent=manager))
                 else:
                     safe_after(lambda: download_progress.set(0))
                     safe_after(lambda: status_label.configure(text="本机体检失败"))
@@ -1057,6 +1293,7 @@ def show_engine_manager(parent, icon_photo=None, engine_ready=True) -> None:
     add_action_button(more_row, text="GPU 升级指南", width=100, command=show_gpu_upgrade_guide)
 
     refresh()
+    refresh_demucs_status()
     check_engine_resources()
     manager.deiconify()
     manager.lift()

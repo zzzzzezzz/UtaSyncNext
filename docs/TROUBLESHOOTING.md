@@ -119,7 +119,7 @@ run_next.ps1
 UtaSyncNext/.cache/torch/hub/checkpoints/
 ```
 
-如果设置了 `TORCH_HOME`，则是 `$TORCH_HOME/hub/checkpoints/`。缺权重时可先导入/下载权重；若目标是先生成打轴，请在 UI 选择“先跳过 Demucs”。访谈/播客模式本身会跳过 Demucs。
+如果设置了 `TORCH_HOME`，则是 `$TORCH_HOME/hub/checkpoints/`。发布包可直接在“引擎与模型管理”中的“人声分离权重”区域点击“下载/准备权重”；下载支持当前代理和中断续传。缺权重时，任务会在分离前停止；若目标是先生成打轴，请在 UI 选择“先跳过 Demucs”。访谈/播客模式本身会跳过 Demucs。
 
 ## 翻译 API、代理和密钥
 
