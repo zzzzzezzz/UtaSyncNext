@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import re
+import ssl
 import urllib.request
 from contextlib import contextmanager
 from typing import Iterator
+
+import certifi
 
 
 class ProxyConfigError(ValueError):
@@ -32,12 +35,38 @@ def proxy_status_text(value: object) -> str:
 
 
 def build_urllib_opener(value: object) -> urllib.request.OpenerDirector:
+    """Build an urllib opener with proxy support and a portable CA bundle.
+
+    The launcher is distributed with its own Python runtime.  On a fresh
+    Windows machine that runtime may not discover the operating system's CA
+    path even though the browser can open the same HTTPS URL.  Start with the
+    native default context (so installed Windows roots and enterprise proxy
+    roots remain usable), then add the bundled certifi roots as a fallback.
+    """
     normalized = normalize_proxy_url(value)
-    if not normalized:
-        return urllib.request.build_opener()
-    return urllib.request.build_opener(
+    proxy_handler = (
         urllib.request.ProxyHandler({"http": normalized, "https": normalized})
+        if normalized
+        else urllib.request.ProxyHandler()
     )
+    handlers: list[urllib.request.BaseHandler] = [
+        proxy_handler,
+        urllib.request.HTTPSHandler(context=_build_ssl_context()),
+    ]
+    return urllib.request.build_opener(*handlers)
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    context = ssl.create_default_context()
+    try:
+        # load_verify_locations adds to the native trust store instead of
+        # replacing it, so both bundled public CAs and Windows-installed
+        # proxy/security roots remain available.
+        context.load_verify_locations(cafile=certifi.where())
+    except (OSError, ssl.SSLError):
+        # The native context is still preferable to disabling verification.
+        pass
+    return context
 
 
 @contextmanager

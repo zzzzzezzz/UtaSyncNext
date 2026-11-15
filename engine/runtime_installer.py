@@ -209,14 +209,7 @@ def _download_asset(
 
 
 def _open_url(request: urllib.request.Request, *, timeout: int, proxy_url: str = ""):
-    """Open an installer URL with the user-selected proxy when supplied.
-
-    Keep the empty-proxy path on ``urllib.request.urlopen`` so existing system
-    proxy/environment behavior and lightweight tests remain unchanged.  A
-    non-empty value uses the same normalization rules as model downloads.
-    """
-    if not str(proxy_url or "").strip():
-        return urllib.request.urlopen(request, timeout=timeout)
+    """Open an installer URL with the bundled and native CA roots."""
     opener = build_urllib_opener(proxy_url)
     return opener.open(request, timeout=timeout)
 

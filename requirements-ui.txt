@@ -3,4 +3,5 @@ tkinterdnd2>=0.4.2
 Pillow>=10.0.0
 openai>=1.0.0
 requests>=2.31.0
+certifi>=2024.2.2
 huggingface_hub>=0.23.0

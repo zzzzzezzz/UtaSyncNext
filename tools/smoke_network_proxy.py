@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ssl
 import sys
 import urllib.request
 from pathlib import Path
@@ -57,6 +58,12 @@ def main() -> int:
     _require(
         proxy_handlers[0].proxies.get("https") == "http://127.0.0.1:10808",
         "AI 配色没有使用统一代理地址",
+    )
+    https_handlers = [handler for handler in opener.handlers if isinstance(handler, urllib.request.HTTPSHandler)]
+    _require(bool(https_handlers), "网络请求没有安装 HTTPS 处理器")
+    _require(
+        https_handlers[0]._context.verify_mode == ssl.CERT_REQUIRED,
+        "HTTPS 请求不应关闭证书校验",
     )
 
     migrated = _normalize_settings({

@@ -86,6 +86,13 @@ def main() -> None:
         raise urllib.error.HTTPError("https://example.invalid/manifest.json", 404, "Not Found", {}, None)
 
     runtime_installer.urllib.request.urlopen = missing_manifest
+    original_build_opener = runtime_installer.build_urllib_opener
+
+    class _MissingManifestOpener:
+        def open(self, *_args, **_kwargs):
+            return missing_manifest()
+
+    runtime_installer.build_urllib_opener = lambda _value: _MissingManifestOpener()
     try:
         try:
             fetch_manifest("https://example.invalid/manifest.json")
@@ -94,6 +101,7 @@ def main() -> None:
         else:
             raise AssertionError("a missing manifest should preserve HTTP status 404")
     finally:
+        runtime_installer.build_urllib_opener = original_build_opener
         runtime_installer.urllib.request.urlopen = original_urlopen
     print("PASS: runtime installer downloads, verifies, extracts, and installs a local manifest")
 
